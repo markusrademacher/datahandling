@@ -222,8 +222,8 @@ class DataObject():
                 raise ValueError("If loading a .mat files saved by the picoscope you must enter a relative channel number to load")
             ChannelIDs = ['A','B','C','D']
             raw = scipy.io.loadmat(self.filepath)
-            self.voltage = raw[ChannelIDs[RelativeChannelNo]]
-            timeParams = (0,(len(self.voltage)-1)*raw['Tinterval'],raw['Tinterval'])
+            self.voltage = raw[ChannelIDs[RelativeChannelNo]].flatten()
+            timeParams = (0,(len(self.voltage)-1)*raw['Tinterval'].flatten()[0],raw['Tinterval'].flatten()[0])
             self.SampleFreq = 1/timeParams[2]
         startTime, endTime, Timestep = timeParams
         self.timeStart = startTime
