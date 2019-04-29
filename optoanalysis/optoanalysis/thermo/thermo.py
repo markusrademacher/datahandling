@@ -42,6 +42,9 @@ class ThermoObject(optoanalysis.DataObject):
         RelativeChannelNo : int, optional
             If loading a .bin file produced by the Saleae datalogger, used to specify
             the channel number
+            If loading a .mat file produced by the picoscope using picolog, used to 
+            specifiy the channel ID as follows: 0 = Channel 'A', 1 = Channel 'B', 
+            2 = Channel 'C' and 3 = Channel 'D'
             If loading a .dat file produced by the labview NI5122 daq card, used to 
             specifiy the channel number if two channels where saved, if left None with 
             .dat files it will assume that the file to load only contains one channel.

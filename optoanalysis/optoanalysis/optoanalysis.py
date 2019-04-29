@@ -110,6 +110,9 @@ class DataObject():
         RelativeChannelNo : int, optional
             If loading a .bin file produced by the Saleae datalogger, used to specify
             the channel number
+            If loading a .mat file produced by the picoscope using picolog, used to 
+            specifiy the channel ID as follows: 0 = Channel 'A', 1 = Channel 'B', 
+            2 = Channel 'C' and 3 = Channel 'D'
             If loading a .dat file produced by the labview NI5122 daq card, used to 
             specifiy the channel number if two channels where saved, if left None with 
             .dat files it will assume that the file to load only contains one channel.
@@ -155,7 +158,10 @@ class DataObject():
         Parameters
         ----------
         RelativeChannelNo : int, optional
-             Channel number for loading saleae data files
+             Channel number for loading .bin saleae data files
+             If loading a .mat file produced by the picoscope using picolog, used to 
+             specifiy the channel ID as follows: 0 = Channel 'A', 1 = Channel 'B', 
+             2 = Channel 'C' and 3 = Channel 'D'
              If loading a .dat file produced by the labview NI5122 daq card, used to 
              specifiy the channel number if two channels where saved, if left None with 
              .dat files it will assume that the file to load only contains one channel.
@@ -171,11 +177,11 @@ class DataObject():
              specified by the channel number set in the RelativeChannelNo parameter. 
              WORKS WITH NI5122 DATA SO FAR ONLY!!!
         """
-        f = open(self.filepath, 'rb')
-        raw = f.read()
-        f.close()
         FileExtension = self.filepath.split('.')[-1]
         if FileExtension == "raw" or FileExtension == "trc":
+            f = open(self.filepath, 'rb')
+            raw = f.read()
+            f.close()
             with _warnings.catch_warnings(): # supress missing data warning and raise a missing
                 # data warning from optoanalysis with the filepath
                 _warnings.simplefilter("ignore")
@@ -186,6 +192,9 @@ class DataObject():
         elif FileExtension == "bin":
             if RelativeChannelNo == None:
                 raise ValueError("If loading a .bin file from the Saleae data logger you must enter a relative channel number to load")
+            f = open(self.filepath, 'rb')
+            raw = f.read()
+            f.close()
             timeParams, self.voltage = optoanalysis.Saleae.interpret_waveform(raw, RelativeChannelNo)
             self.SampleFreq = 1/timeParams[2]
         elif FileExtension == "dat": #for importing a file written by labview using the NI5122 daq card
@@ -205,6 +214,14 @@ class DataObject():
                 elif NormaliseByMonitorOutput == False:
                     self.voltage = filedata[RelativeChannelNo:len(filedata):2]
             timeParams = (0,(len(self.voltage)-1)/SampleFreq,1/SampleFreq)
+            self.SampleFreq = 1/timeParams[2]
+        elif FileExtension == "mat":
+            if RelativeChannelNo == None:
+                raise ValueError("If loading a .mat files saved by the picoscope you must enter a relative channel number to load")
+            ChannelIDs = ['A','B','C','D']
+            raw = scipy.io.loadmat(self.filepath)
+            self.voltage = raw[ChannelIDs[RelativeChannelNo]]
+            timeParams = (0,(len(self.voltage)-1)*raw['Tinterval'],raw['Tinterval'])
             self.SampleFreq = 1/timeParams[2]
         startTime, endTime, Timestep = timeParams
         self.timeStart = startTime
@@ -1331,6 +1348,9 @@ def load_data(Filepath, ObjectType='data', RelativeChannelNo=None, SampleFreq=No
     RelativeChannelNo : int, optional
         If loading a .bin file produced by the Saneae datalogger, used to specify
         the channel number
+        If loading a .mat file produced by the picoscope using picolog, used to 
+        specifiy the channel ID as follows: 0 = Channel 'A', 1 = Channel 'B', 
+        2 = Channel 'C' and 3 = Channel 'D'
         If loading a .dat file produced by the labview NI5122 daq card, used to 
         specifiy the channel number if two channels where saved, if left None with 
         .dat files it will assume that the file to load only contains one channel.
