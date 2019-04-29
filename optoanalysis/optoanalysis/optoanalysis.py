@@ -30,6 +30,8 @@ from scipy.constants import Boltzmann, pi
 from os.path import exists as _does_file_exist
 from skimage.transform import iradon_sart as _iradon_sart
 import gc
+import scipy.io
+
 try:
     try:
         import pycuda.autoinit
