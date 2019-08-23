@@ -17,7 +17,6 @@ import fnmatch as _fnmatch
 from multiprocessing import Pool as _Pool
 from multiprocessing import cpu_count as _cpu_count
 from scipy.optimize import minimize as _minimize
-36
 import warnings as _warnings
 from scipy.signal import hilbert as _hilbert
 import matplotlib as _mpl
