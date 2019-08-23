@@ -29,6 +29,8 @@ from frange import frange
 from scipy.constants import Boltzmann, pi
 from os.path import exists as _does_file_exist
 from skimage.transform import iradon_sart as _iradon_sart
+from nptdms import TdmsFile as _TdmsFile
+import csv
 import gc
 import scipy.io
 
@@ -225,6 +227,36 @@ class DataObject():
             self.voltage = raw[ChannelIDs[RelativeChannelNo]].flatten()
             timeParams = (0,(len(self.voltage)-1)*raw['Tinterval'].flatten()[0],raw['Tinterval'].flatten()[0])
             self.SampleFreq = 1/timeParams[2]
+        elif FileExtension == "tdms": # for importing a file written by labview form the NI7961 FPGA with the RecordDataPC VI
+            if SampleFreq == None:
+                raise ValueError("If loading a .tdms file saved from the FPGA you must enter a SampleFreq")
+            self.SampleFreq = SampleFreq
+            dt = 1/self.SampleFreq
+            FIFO_SIZE = 262143 # this is the maximum size of the DMA FIFO on the NI 7961 FPGA with the NI 5781 DAC card
+            tdms_file = _TdmsFile(self.filepath)
+            channel = tdms_file.object('Measured_Data', 'data')
+            data = channel.data[FIFO_SIZE:] # dump first 1048575 points of data
+            # as this is the values that had already filled the buffer
+            # from before when the record code started running
+            volts_per_unit = 2/(2**14)
+            self.voltage = volts_per_unit*data
+            timeParams = [0, (data.shape[0]-1)*dt, dt]
+        elif FileExtension == 'txt': # .txt file created by LeCroy Oscilloscope
+            data = []
+            with open(self.filepath, 'r') as csvfile:
+                reader = csv.reader(csvfile)
+                for row in reader:
+                    data.append(row)
+            data = _np.array(data[5:]).astype(float).transpose()
+            t0 = data[0][0]
+            tend = data[0][-1]
+            dt = data[0][1] - data[0][0]
+            self.SampleFreq = 1/dt
+            self.voltage = data[1]
+            del(data)
+            timeParams = [t0, tend, dt]
+        else:
+            raise ValueError("Filetype not supported")
         startTime, endTime, Timestep = timeParams
         self.timeStart = startTime
         self.timeEnd = endTime
@@ -1400,12 +1432,15 @@ def load_data(Filepath, ObjectType='data', RelativeChannelNo=None, SampleFreq=No
         if _does_file_exist(data.filepath.replace(data.filename, '') + "pressure.log"):
             print("pressure.log file exists")
             for line in open(data.filepath.replace(data.filename, '') + "pressure.log", 'r'):
-                run_number, repeat_number, pressure = line.split(',')[1:]
+                stamp, run_number, repeat_number, pressure = line.split(',')[0:]
+                stamp =  datetime.strptime(stamp,'%Y-%m-%d_%H-%M-%S')
                 run_number = int(run_number)
                 repeat_number = int(repeat_number)
                 pressure = float(pressure)
                 if (run_number == data.run_number) and (repeat_number == data.repeat_number):
-                    data.pmbar = pressure    
+                    data.pmbar = pressure
+                elif stamp == datetime.strptime(data.filename[:15],'%Y%m%d_%H%M%S'):
+                    data.pmbar = pressure
     except ValueError:
         pass
     try:
@@ -1446,7 +1481,6 @@ def search_data_std(Channel, RunNos, RepeatNos, directoryPath='.'):
     for file_ in files:
         if 'CH{}'.format(Channel) in file_:
             files_CorrectChannel.append(file_)
-    print(files_CorrectChannel)
     files_CorrectRunNo = []
     for RunNo in RunNos:
         files_match = _fnmatch.filter(
@@ -1578,14 +1612,13 @@ def search_data_custom(Channel, TraceTitle, RunNos, directoryPath='.'):
     for file_ in files:
         if 'C{}'.format(Channel) in file_:
             files_CorrectChannel.append(file_)
-    print(files_CorrectChannel)
     files_CorrectRunNo = []
     for RunNo in RunNos:
         files_match = _fnmatch.filter(
             files_CorrectChannel, '*C{}'.format(Channel)+TraceTitle+str(RunNo).zfill(5)+'.*')
         for file_ in files_match:
             files_CorrectRunNo.append(file_)
-    print(files_CorrectRunNo)
+    print("loading the following files: {}".format(files_CorrectRunNo))
     paths = files_CorrectRunNo
     return paths
 
@@ -2177,7 +2210,7 @@ def extract_parameters(Pressure, PressureErr, A, AErr, Gamma0, Gamma0Err, method
         _np.sqrt(((PressureErr * Pressure) / Pressure)
                  ** 2 + (Gamma0Err / Gamma0)**2)
     mass = rho * ((4 * pi * radius**3) / 3)
-    err_mass = mass * 2 * err_radius / radius
+    err_mass = mass * 3 * err_radius / radius
     conversionFactor = _np.sqrt(A * mass / (4 * kB * T0 * Gamma0))
     err_conversionFactor = conversionFactor * \
         _np.sqrt((AErr / A)**2 + (err_mass / mass)
@@ -4458,3 +4491,35 @@ def fit_data(freq_array, S_xx_array, AGuess, OmegaTrap, GammaGuess, make_fig=Tru
         return Params_Fit, Params_Fit_Err, fig, ax
     else:
         return Params_Fit, Params_Fit_Err, None, None
+
+def calc_reduced_chi_squared(y_observed, y_model, observation_error, number_of_fitted_parameters):
+    """
+    Calculates the reduced chi-squared, used to compare a model to observations. For example can be used to calculate how good a fit is by using fitted y values for y_model along with observed y values and error in those y values. Reduced chi-squared should be close to 1 for a good fit, lower than 1 suggests you are overestimating the measurement error (observation_error you entered is higher than the true error in the measurement). A value higher than 1 suggests either your model is a bad fit OR you are underestimating the error in the measurement (observation_error you entered is lower than the true error in the measurement). See https://en.wikipedia.org/wiki/Reduced_chi-squared_statistic for more detail.
+    
+    Parameters
+    ----------
+    y_observed : ndarray
+        array of measured/observed values of some variable y which you are fitting to.
+    y_model : ndarray
+        array of y values predicted by your model/fit (predicted y values corresponding to y_observed)
+    observation_error : float
+        error in the measurements/observations of y
+    number_of_fitted_parameters : float
+        number of parameters in your model
+
+    Returns
+    -------
+    chi2_reduced : float
+        reduced chi-squared parameter
+    """
+    observed = _np.array(y_observed)
+    expected = _np.array(y_model)
+    if observed.shape != expected.shape:
+        raise ValueError("y_observed should have same number of elements as y_model")
+    residuals = (observed - expected)
+    z = residuals / observation_error # residuals divided by known error in measurement
+    chi2 = _np.sum(z**2) # chi squared value
+    num_of_observations = len(observed)
+    v = num_of_observations - number_of_fitted_parameters # v = number of degrees of freedom
+    chi2_reduced = chi2/v
+    return chi2_reduced
