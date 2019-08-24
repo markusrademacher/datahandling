@@ -1458,6 +1458,9 @@ def load_data(Filepath, ObjectType='data', RelativeChannelNo=None, SampleFreq=No
         data.run_number = run_number
         data.repeat_number = repeat_number
     except ValueError:
+        data.channel_number = None
+        data.run_number = None
+        data.repeat_number = None
         pass
     try:
         if _does_file_exist(data.filepath.replace(data.filename, '') + "pressure.log"):
