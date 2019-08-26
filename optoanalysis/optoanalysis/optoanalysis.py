@@ -215,6 +215,16 @@ class DataObject():
             timeParams, self.voltage = optoanalysis.Saleae.interpret_waveform(raw, RelativeChannelNo)
             self.SampleFreq = 1/timeParams[2]
         elif FileExtension == "bin":
+            try:
+                if _does_file_exist(self.filepath.replace(self.filename, '') + "streaming_parameter.log"):
+                    print("streaming_parameter.log file exists")
+                    for line in open(data.filepath.replace(data.filename, '') + "streaming_parameter.log", 'r'):
+                        filename, sample_frequency, number_of_channels = line.split(',')[0:]
+                        if self.filename == filename:
+                            SampleFreq = float(sample_frequency)
+                            NumberOfChannels = int(number_of_channels)    
+            except ValueError:
+                pass
             if SampleFreq == None:
                 raise ValueError("If loading a .bin file from the Picoscope you must enter a SampleFreq")
             if RelativeChannelNo == None:
