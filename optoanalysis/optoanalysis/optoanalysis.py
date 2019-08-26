@@ -206,7 +206,7 @@ class DataObject():
             if missingdata:
                 _warnings.warn("Waveform not of expected length. File {} may be missing data.".format(self.filepath))
             self.SampleFreq = (1 / waveDescription["HORIZ_INTERVAL"])
-        elif FileExtension == "bin" and_does_file_exist(self.filepath.replace(self.filename, '') + "streaming_parameter.log") == False and NumberOfChannels == None:
+        elif FileExtension == "bin" and _does_file_exist(self.filepath.replace(self.filename, '') + "streaming_parameter.log") == False and NumberOfChannels == None:
             if RelativeChannelNo == None:
                 raise ValueError("If loading a .bin file from the Saleae data logger you must enter a relative channel number to load")
             f = open(self.filepath, 'rb')
