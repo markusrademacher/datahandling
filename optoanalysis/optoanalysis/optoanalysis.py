@@ -133,7 +133,7 @@ class DataObject():
              Total number of channels present in a .bin file recorded using a Picoscope.
         PointsToLoad : int, optional
              Number of first points to read. -1 means all points (i.e., the complete file)
-             WORKS WITH NI5122, PICOSCOPE AND .BIN DATA SO FAR ONLY!!!
+             WORKS WITH NI5122 AND PICOSCOPE .BIN DATA SO FAR ONLY!!!
         calcPSD : bool, optional
             Whether to calculate the PSD upon loading the file, can take some time
             off the loading and reduce memory usage if frequency space info is not required
@@ -188,7 +188,7 @@ class DataObject():
              Total number of channels present in a .bin file recorded using a Picoscope.
         PointsToLoad : int, optional
              Number of first points to read. -1 means all points (i.e., the complete file)
-             WORKS WITH NI5122, PICOSCOPE AND .BIN DATA SO FAR ONLY!!!
+             WORKS WITH NI5122 AND PICOSCOPE .BIN DATA SO FAR ONLY!!!
         NormaliseByMonitorOutput : bool, optional
              If True the particle signal trace will be divided by the monitor output, which is
              specified by the channel number set in the RelativeChannelNo parameter. 
@@ -206,7 +206,7 @@ class DataObject():
             if missingdata:
                 _warnings.warn("Waveform not of expected length. File {} may be missing data.".format(self.filepath))
             self.SampleFreq = (1 / waveDescription["HORIZ_INTERVAL"])
-        elif FileExtension == "bin" and NumberOfChannels == None:
+        elif FileExtension == "bin" and_does_file_exist(self.filepath.replace(self.filename, '') + "streaming_parameter.log") == False and NumberOfChannels == None:
             if RelativeChannelNo == None:
                 raise ValueError("If loading a .bin file from the Saleae data logger you must enter a relative channel number to load")
             f = open(self.filepath, 'rb')
@@ -227,6 +227,8 @@ class DataObject():
                 pass
             if SampleFreq == None:
                 raise ValueError("If loading a .bin file from the Picoscope you must enter a SampleFreq")
+            if NumberOfChannels == None:
+                raise ValueError("If loading a .bin file from the Picoscope you must enter a NumberOfChannels")
             if RelativeChannelNo == None:
                 self.voltage = _np.fromfile(self.filepath, dtype='int16',count=PointsToLoad)
             elif RelativeChannelNo != None:
@@ -1433,7 +1435,7 @@ def load_data(Filepath, ObjectType='data', RelativeChannelNo=None, SampleFreq=No
         Total number of channels present in a .bin file recorded using a Picoscope.
     PointsToLoad : int, optional
         Number of first points to read. -1 means all points (i.e., the complete file)
-        WORKS WITH NI5122, PICOSCOPE AND .BIN DATA SO FAR ONLY!!!
+        WORKS WITH NI5122 AND PICOSCOPE .BIN DATA SO FAR ONLY!!!
     calcPSD : bool, optional
         Whether to calculate the PSD upon loading the file, can take some time
         off the loading and reduce memory usage if frequency space info is not required
