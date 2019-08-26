@@ -218,7 +218,7 @@ class DataObject():
             try:
                 if _does_file_exist(self.filepath.replace(self.filename, '') + "streaming_parameter.log"):
                     print("streaming_parameter.log file exists")
-                    for line in open(self.filepath.replace(data.filename, '') + "streaming_parameter.log", 'r'):
+                    for line in open(self.filepath.replace(self.filename, '') + "streaming_parameter.log", 'r'):
                         filename, sample_frequency, number_of_channels = line.split(',')[0:]
                         if self.filename == filename:
                             SampleFreq = float(sample_frequency)
