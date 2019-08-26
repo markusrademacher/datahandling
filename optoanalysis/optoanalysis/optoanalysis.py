@@ -221,8 +221,10 @@ class DataObject():
                     for line in open(self.filepath.replace(self.filename, '') + "streaming_parameter.log", 'r'):
                         filename, sample_frequency, number_of_channels = line.split(',')[0:]
                         if self.filename == filename:
-                            SampleFreq = float(sample_frequency)
-                            NumberOfChannels = int(number_of_channels)    
+                            if SampleFreq == None:
+                                SampleFreq = float(sample_frequency)
+                            if NumberOfChannels == None:
+                                NumberOfChannels = int(number_of_channels)    
             except ValueError:
                 pass
             if SampleFreq == None:
