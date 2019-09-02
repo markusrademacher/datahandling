@@ -3780,11 +3780,12 @@ def multi_subplots_time(DataArray,
 def arrange_plots_on_one_canvas(FigureAxTupleArray,
                                 title='',
                                 SubtitleArray=[],
+                                number_of_columns=2,
                                 show_fig=True):
     """
     Arranges plots, given in an array of tuples consisting of fig and axs, 
-    onto a subplot-figure consisting of 2 horizontal times the lenght of the
-    passed (fig,axs)-array divided by 2 vertical subplots 
+    onto a subplot-figure consisting of number_of_columns horizontal times the lenght of the
+    passed (fig,axs)-array divided by number_of_columns vertical subplots 
 
     Parameters
     ----------
@@ -3795,6 +3796,9 @@ def arrange_plots_on_one_canvas(FigureAxTupleArray,
         string for the global title of the overall combined figure 
     SubtitleArray : array-like, optional
         array of titles for each figure-set to be plotted, i.e. subplots 
+    number_of_columns : int, optional
+       Number of columns in the subplot grid
+       By default set to 2 columns
     show_fig : bool, optional
        If True runs plt.show() before returning figure
        if False it just returns the figure object.
@@ -3811,19 +3815,19 @@ def arrange_plots_on_one_canvas(FigureAxTupleArray,
             for i in _np.arange(0, len(FigureAxTupleArray), 1)
         ]
     SingleFigSize = FigureAxTupleArray[0][0].get_size_inches()
-    combinedFig = _plt.figure(figsize=(2 * SingleFigSize[0],
-                                       _np.ceil(len(FigureAxTupleArray) / 2) *
+    combinedFig = _plt.figure(figsize=(number_of_columns * SingleFigSize[0],
+                                       _np.ceil(len(FigureAxTupleArray) / number_of_columns) *
                                        SingleFigSize[1]))
     for index in range(len(FigureAxTupleArray)):
         individualPlot = FigureAxTupleArray[index]
         individualPlot[0].set_size_inches(
-            (2 * SingleFigSize[0],
-             _np.ceil(len(FigureAxTupleArray) / 2) * SingleFigSize[1]))
+            (number_of_columns * SingleFigSize[0],
+             _np.ceil(len(FigureAxTupleArray) / number_of_columns) * SingleFigSize[1]))
         ax = individualPlot[1]
         ax.set_title(SubtitleArray[index])
         ax.remove()
         ax.figure = combinedFig
-        ax.change_geometry(int(_np.ceil(len(FigureAxTupleArray) / 2)), 2,
+        ax.change_geometry(int(_np.ceil(len(FigureAxTupleArray) / number_of_columns)), number_of_columns,
                            1 + index)
         combinedFig.axes.append(ax)
         combinedFig.add_axes(ax)
