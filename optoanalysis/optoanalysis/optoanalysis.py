@@ -57,8 +57,8 @@ except NameError as e:
 # cpu_count = _cpu_count()
 # workerPool = _Pool(cpu_count)
 
-_mpl.rcParams[
-    'lines.markeredgewidth'] = 1  # set default markeredgewidth to 1 overriding seaborn's default value of 0
+# set default markeredgewidth to 1 overriding seaborn's default value of 0
+_mpl.rcParams['lines.markeredgewidth'] = 1
 _sns.set_style("whitegrid")
 
 
@@ -66,7 +66,7 @@ def GenCmap(basecolor, ColorRange, NumOfColors, logscale=False):
     if NumOfColors > 256:
         _warnings.warn("Maximum Number of colors is 256", UserWarning)
         NumOfColors = 256
-    if logscale == True:
+    if logscale:
         colors = [
             _sns.set_hls_values(basecolor, l=l)
             for l in _np.logspace(ColorRange[0], ColorRange[1], NumOfColors)
@@ -185,7 +185,7 @@ class DataObject():
         self.filedir = self.filepath[0:-len(self.filename)]
         self.load_time_data(RelativeChannelNo, SampleFreq, NumberOfChannels,
                             PointsToLoad, NormaliseByMonitorOutput)
-        if calcPSD != False:
+        if calcPSD:
             self.get_PSD(NPerSegmentPSD)
         return None
 
@@ -246,14 +246,14 @@ class DataObject():
                     raise(error)
             if missingdata:
                 _warnings.warn(
-                    "Waveform not of expected length. File {} may be missing data."
-                    .format(self.filepath))
+                    "Waveform not of expected length. File {} may be missing data." .format(
+                        self.filepath))
             self.SampleFreq = (1 / waveDescription["HORIZ_INTERVAL"])
         elif FileExtension == "bin" and _does_file_exist(
                 self.filepath.replace(self.filename, '') +
                 "streaming_parameter.log"
         ) == False and NumberOfChannels == None:
-            if RelativeChannelNo == None:
+            if RelativeChannelNo is None:
                 raise ValueError(
                     "If loading a .bin file from the Saleae data logger you must enter a relative channel number to load"
                 )
@@ -275,25 +275,25 @@ class DataObject():
                         filename, sample_frequency, number_of_channels = line.split(
                             ',')[0:]
                         if self.filename == filename:
-                            if SampleFreq == None:
+                            if SampleFreq is None:
                                 SampleFreq = float(sample_frequency)
-                            if NumberOfChannels == None:
+                            if NumberOfChannels is None:
                                 NumberOfChannels = int(number_of_channels)
             except ValueError:
                 pass
-            if SampleFreq == None:
+            if SampleFreq is None:
                 raise ValueError(
                     "If loading a .bin file from the Picoscope you must enter a SampleFreq"
                 )
-            if NumberOfChannels == None:
+            if NumberOfChannels is None:
                 raise ValueError(
                     "If loading a .bin file from the Picoscope you must enter a NumberOfChannels"
                 )
-            if RelativeChannelNo == None:
+            if RelativeChannelNo is None:
                 self.voltage = _np.fromfile(self.filepath,
                                             dtype='int16',
                                             count=PointsToLoad)
-            elif RelativeChannelNo != None:
+            elif RelativeChannelNo is not None:
                 filedata = _np.fromfile(self.filepath,
                                         dtype='int16',
                                         count=PointsToLoad)
@@ -303,19 +303,19 @@ class DataObject():
                           1 / SampleFreq)
             self.SampleFreq = 1 / timeParams[2]
         elif FileExtension == "dat":  # for importing a file written by labview using the NI5122 daq card
-            if SampleFreq == None:
+            if SampleFreq is None:
                 raise ValueError(
                     "If loading a .dat file from the NI5122 daq card you must enter a SampleFreq"
                 )
-            if RelativeChannelNo == None:
+            if RelativeChannelNo is None:
                 self.voltage = _np.fromfile(self.filepath,
                                             dtype='>h',
                                             count=PointsToLoad)
-            elif RelativeChannelNo != None:
+            elif RelativeChannelNo is not None:
                 filedata = _np.fromfile(self.filepath,
                                         dtype='>h',
                                         count=PointsToLoad)
-                if NormaliseByMonitorOutput == True:
+                if NormaliseByMonitorOutput:
                     if RelativeChannelNo == 0:
                         monitorsignal = filedata[:len(filedata):2]
                         self.voltage = filedata[1:len(filedata
@@ -330,7 +330,7 @@ class DataObject():
                           1 / SampleFreq)
             self.SampleFreq = 1 / timeParams[2]
         elif FileExtension == "mat":
-            if RelativeChannelNo == None:
+            if RelativeChannelNo is None:
                 raise ValueError(
                     "If loading a .mat files saved by the picoscope you must enter a relative channel number to load"
                 )
@@ -342,13 +342,14 @@ class DataObject():
                           raw['Tinterval'].flatten()[0])
             self.SampleFreq = 1 / timeParams[2]
         elif FileExtension == "tdms":  # for importing a file written by labview form the NI7961 FPGA with the RecordDataPC VI
-            if SampleFreq == None:
+            if SampleFreq is None:
                 raise ValueError(
                     "If loading a .tdms file saved from the FPGA you must enter a SampleFreq"
                 )
             self.SampleFreq = SampleFreq
             dt = 1 / self.SampleFreq
-            # this is the maximum size of the DMA FIFO on the NI 7961 FPGA with the NI 5781 DAC card
+            # this is the maximum size of the DMA FIFO on the NI 7961 FPGA with
+            # the NI 5781 DAC card
             FIFO_SIZE = 262143
             tdms_file = _TdmsFile(self.filepath)
             channel = tdms_file.object('Measured_Data', 'data')
@@ -398,15 +399,15 @@ class DataObject():
                 horizontal_scale = data[11, 1].astype(float)
                 Yzero = data[13, 1].astype(float)
 
-                time = horizontal*horizontal_scale
-                voltage = (verticle - verticle_offset)*verticle_scale
+                time = horizontal * horizontal_scale
+                voltage = (verticle - verticle_offset) * verticle_scale
 
                 t0 = time[0]
                 tend = time[-1]
                 timeParams = [t0, tend, dt]
                 del(data)
                 del(time)
-                self.SampleFreq = 1/dt
+                self.SampleFreq = 1 / dt
                 self.voltage = voltage
             elif data[0][1] == 'DPO2024B':
                 column_names = data[15]
@@ -433,23 +434,23 @@ class DataObject():
                 # (verticle - verticle_offset) #*verticle_scale
                 voltage = verticle
 
-                dt = time[1]-time[0]  # dt from meta-data is not reliable
+                dt = time[1] - time[0]  # dt from meta-data is not reliable
                 t0 = time[0]
                 tend = time[-1]
                 timeParams = [t0, tend, dt]
                 del(data)
                 del(time)
-                self.SampleFreq = 1/dt
+                self.SampleFreq = 1 / dt
                 self.voltage = voltage
             elif data[0, 0] == 'time' and data[0, 1] == 'voltage':
                 time, voltage = data[1:].T.astype(float)
-                dt = time[1]-time[0]  # dt from meta-data is not reliable
+                dt = time[1] - time[0]  # dt from meta-data is not reliable
                 t0 = time[0]
                 tend = time[-1]
                 timeParams = [t0, tend, dt]
                 del(data)
                 del(time)
-                self.SampleFreq = 1/dt
+                self.SampleFreq = 1 / dt
                 self.voltage = voltage
             else:
                 raise ValueError(
@@ -484,10 +485,10 @@ class DataObject():
         voltage : ndarray
             array containing the sampled voltages
         """
-        if timeStart == None:
+        if timeStart is None:
             timeStart = self.timeStart
 
-        if timeEnd == None:
+        if timeEnd is None:
             timeEnd = self.timeEnd
 
         time = self.time.get_array()
@@ -516,7 +517,12 @@ class DataObject():
         df.to_csv(filename)
         return None
 
-    def plot_time_data(self, timeStart=None, timeEnd=None, units='s', show_fig=True):
+    def plot_time_data(
+            self,
+            timeStart=None,
+            timeEnd=None,
+            units='s',
+            show_fig=True):
         """
         plot time data against voltage data.
 
@@ -543,9 +549,9 @@ class DataObject():
             The subplot object created
         """
         unit_prefix = units[:-1]  # removed the last char
-        if timeStart == None:
+        if timeStart is None:
             timeStart = self.timeStart
-        if timeEnd == None:
+        if timeEnd is None:
             timeEnd = self.timeEnd
 
         time = self.time.get_array()
@@ -560,7 +566,7 @@ class DataObject():
         ax.set_xlabel("time ({})".format(units))
         ax.set_ylabel("voltage (V)")
         ax.set_xlim([timeStart, timeEnd])
-        if show_fig == True:
+        if show_fig:
             _plt.show()
         return fig, ax
 
@@ -595,16 +601,16 @@ class DataObject():
                 Array containing the value of the PSD at the corresponding
                 frequency value in V**2/Hz
         """
-        if timeStart == None and timeEnd == None:
+        if timeStart is None and timeEnd is None:
             freqs, PSD = calc_PSD(self.voltage,
                                   self.SampleFreq,
                                   NPerSegment=NPerSegment)
             self.PSD = PSD
             self.freqs = freqs
         else:
-            if timeStart == None:
+            if timeStart is None:
                 timeStart = self.timeStart
-            if timeEnd == None:
+            if timeEnd is None:
                 timeEnd = self.timeEnd
 
             time = self.time.get_array()
@@ -617,7 +623,7 @@ class DataObject():
             freqs, PSD = calc_PSD(self.voltage[StartIndex:EndIndex],
                                   self.SampleFreq,
                                   NPerSegment=NPerSegment)
-            if override == True:
+            if override:
                 self.freqs = freqs
                 self.PSD = PSD
 
@@ -654,14 +660,14 @@ class DataObject():
             The subplot object created
         """
         #        self.get_PSD()
-        if timeStart == None and timeEnd == None:
+        if timeStart is None and timeEnd is None:
             freqs = self.freqs
             PSD = self.PSD
         else:
             freqs, PSD = self.get_PSD(timeStart=timeStart, timeEnd=timeEnd)
 
         unit_prefix = units[:-2]
-        if xlim == None:
+        if xlim is None:
             xlim = [0, unit_conversion(self.SampleFreq / 2, unit_prefix)]
         fig = _plt.figure(figsize=properties['default_fig_size'])
         ax = fig.add_subplot(111)
@@ -670,7 +676,7 @@ class DataObject():
         ax.set_xlim(xlim)
         ax.grid(which="major")
         ax.set_ylabel("$S_{xx}$ ($V^2/Hz$)")
-        if show_fig == True:
+        if show_fig:
             _plt.show()
         return fig, ax
 
@@ -698,7 +704,16 @@ class DataObject():
         AreaUnderPSD = sum(self.PSD[index_startAreaPSD:index_endAreaPSD])
         return AreaUnderPSD
 
-    def get_fit(self, TrapFreq, WidthOfPeakToFit, A_Initial=0.1e10, Gamma_Initial=400, silent=False, MakeFig=True, show_fig=True, plot_initial=True):
+    def get_fit(
+            self,
+            TrapFreq,
+            WidthOfPeakToFit,
+            A_Initial=0.1e10,
+            Gamma_Initial=400,
+            silent=False,
+            MakeFig=True,
+            show_fig=True,
+            plot_initial=True):
         """
         Function that fits to a peak to the PSD to extract the
         frequency, A factor and Gamma (damping) factor.
@@ -752,14 +767,14 @@ class DataObject():
             - final fit
 
         """
-        if MakeFig == True:
+        if MakeFig:
             Params, ParamsErr, fig, ax = fit_PSD(
                 self, WidthOfPeakToFit, TrapFreq, A_Initial, Gamma_Initial, MakeFig=MakeFig, show_fig=show_fig, plot_initial=plot_initial)
         else:
-            Params, ParamsErr, _, _ = fit_PSD(
-                self, WidthOfPeakToFit, TrapFreq, A_Initial, Gamma_Initial, MakeFig=MakeFig, show_fig=show_fig, plot_initial=plot_initial)
+            Params, ParamsErr, _, _ = fit_PSD(self, WidthOfPeakToFit, TrapFreq, A_Initial,
+                                              Gamma_Initial, MakeFig=MakeFig, show_fig=show_fig, plot_initial=plot_initial)
 
-        if silent == False:
+        if not silent:
             print("\n")
             print("A: {} +- {}% ".format(Params[0],
                                          ParamsErr[0] / Params[0] * 100))
@@ -772,12 +787,20 @@ class DataObject():
         self.OmegaTrap = _uncertainties.ufloat(Params[1], ParamsErr[1])
         self.Gamma = _uncertainties.ufloat(Params[2], ParamsErr[2])
 
-        if MakeFig == True:
+        if MakeFig:
             return self.A, self.OmegaTrap, self.Gamma, fig, ax
         else:
             return self.A, self.OmegaTrap, self.Gamma, None, None
 
-    def get_fit_from_peak(self, lowerLimit, upperLimit, NumPointsSmoothing=1, silent=False, MakeFig=True, show_fig=True, plot_initial=True):
+    def get_fit_from_peak(
+            self,
+            lowerLimit,
+            upperLimit,
+            NumPointsSmoothing=1,
+            silent=False,
+            MakeFig=True,
+            show_fig=True,
+            plot_initial=True):
         """
         Finds approximate values for the peaks central frequency, height,
         and FWHM by looking for the heighest peak in the frequency range defined
@@ -854,7 +877,7 @@ class DataObject():
         try:
             A, OmegaTrap, Gamma, fig, ax \
                 = self.get_fit(CentralFreq,
-                               (upperLimit-lowerLimit)/2,
+                               (upperLimit - lowerLimit) / 2,
                                A_Initial=approx_A,
                                Gamma_Initial=approx_Gamma,
                                silent=silent,
@@ -870,13 +893,22 @@ class DataObject():
         A = self.A
         Gamma = self.Gamma
 
-        omegaArray = 2 * pi *
-           self.freqs[LeftSideOfPeakIndex:RightSideOfPeakIndex]
+        omegaArray = 2 * pi * \
+            self.freqs[LeftSideOfPeakIndex:RightSideOfPeakIndex]
         PSDArray = self.PSD[LeftSideOfPeakIndex:RightSideOfPeakIndex]
 
         return OmegaTrap, A, Gamma, fig, ax
 
-    def get_fit_auto(self, CentralFreq, MaxWidth=15000, MinWidth=500, WidthIntervals=500, MakeFig=True, show_fig=True, silent=False, plot_initial=True):
+    def get_fit_auto(
+            self,
+            CentralFreq,
+            MaxWidth=15000,
+            MinWidth=500,
+            WidthIntervals=500,
+            MakeFig=True,
+            show_fig=True,
+            silent=False,
+            plot_initial=True):
         """
         Tries a range of regions to search for peaks and runs the one with the least error
         and returns the parameters with the least errors.
@@ -936,7 +968,7 @@ class DataObject():
             if TotalSumSquaredError < MinTotalSumSquaredError:
                 MinTotalSumSquaredError = TotalSumSquaredError
                 BestWidth = Width
-        if silent != True:
+        if not silent:
             print("found best")
         try:
             OmegaTrap, A, Gamma, fig, ax \
@@ -956,7 +988,13 @@ class DataObject():
         self.FTrap = OmegaTrap / (2 * pi)
         return OmegaTrap, A, Gamma, fig, ax
 
-    def calc_gamma_from_variance_autocorrelation_fit(self, NumberOfOscillations, GammaGuess=None, silent=False, MakeFig=True, show_fig=True):
+    def calc_gamma_from_variance_autocorrelation_fit(
+            self,
+            NumberOfOscillations,
+            GammaGuess=None,
+            silent=False,
+            MakeFig=True,
+            show_fig=True):
         """
         Calculates the total damping, i.e. Gamma, by splitting the time trace
         into chunks of NumberOfOscillations oscillations and calculated the
@@ -1009,13 +1047,13 @@ class DataObject():
         time = _np.array(range(
             len(autocorrelation))) * SplittedArraySize / self.SampleFreq
 
-        if GammaGuess == None:
+        if GammaGuess is None:
             Gamma_Initial = (time[4] - time[0]) / (autocorrelation[0] -
                                                    autocorrelation[4])
         else:
             Gamma_Initial = GammaGuess
 
-        if MakeFig == True:
+        if MakeFig:
             Params, ParamsErr, fig, ax = fit_autocorrelation(autocorrelation,
                                                              time,
                                                              Gamma_Initial,
@@ -1028,14 +1066,14 @@ class DataObject():
                                                           MakeFig=MakeFig,
                                                           show_fig=show_fig)
 
-        if silent == False:
+        if not silent:
             print("\n")
             print("Big Gamma: {} +- {}% ".format(
                 Params[0], ParamsErr[0] / Params[0] * 100))
 
         Gamma = _uncertainties.ufloat(Params[0], ParamsErr[0])
 
-        if MakeFig == True:
+        if MakeFig:
             return Gamma, fig, ax
         else:
             return Gamma, None, None
@@ -1081,13 +1119,13 @@ class DataObject():
             (_np.diff(self.voltage) * self.SampleFreq)**2)
         time = self.time.get_array()[:len(autocorrelation)]
 
-        if GammaGuess == None:
+        if GammaGuess is None:
             Gamma_Initial = (time[4] - time[0]) / (autocorrelation[0] -
                                                    autocorrelation[4])
         else:
             Gamma_Initial = GammaGuess
 
-        if MakeFig == True:
+        if MakeFig:
             Params, ParamsErr, fig, ax = fit_autocorrelation(autocorrelation,
                                                              time,
                                                              Gamma_Initial,
@@ -1100,14 +1138,14 @@ class DataObject():
                                                           MakeFig=MakeFig,
                                                           show_fig=show_fig)
 
-        if silent == False:
+        if not silent:
             print("\n")
             print("Big Gamma: {} +- {}% ".format(
                 Params[0], ParamsErr[0] / Params[0] * 100))
 
         Gamma = _uncertainties.ufloat(Params[0], ParamsErr[0])
 
-        if MakeFig == True:
+        if MakeFig:
             return Gamma, fig, ax
         else:
             return Gamma, None, None
@@ -1156,19 +1194,19 @@ class DataObject():
         autocorrelation = calc_autocorrelation(self.voltage)
         time = self.time.get_array()[:len(autocorrelation)]
 
-        if GammaGuess == None:
+        if GammaGuess is None:
             Gamma_Initial = (autocorrelation[0] - autocorrelation[int(
                 self.SampleFreq / self.FTrap.n)]) / (time[int(
                     self.SampleFreq / self.FTrap.n)] - time[0]) * 2 * _np.pi
         else:
             Gamma_Initial = GammaGuess
 
-        if FreqTrapGuess == None:
+        if FreqTrapGuess is None:
             FreqTrap_Initial = self.FTrap.n
         else:
             FreqTrap_Initial = FreqTrapGuess
 
-        if MakeFig == True:
+        if MakeFig:
             Params, ParamsErr, fig, ax = fit_autocorrelation(autocorrelation,
                                                              time,
                                                              Gamma_Initial,
@@ -1185,7 +1223,7 @@ class DataObject():
                                                           MakeFig=MakeFig,
                                                           show_fig=show_fig)
 
-        if silent == False:
+        if not silent:
             print("\n")
 
             print(
@@ -1196,7 +1234,7 @@ class DataObject():
         Gamma = _uncertainties.ufloat(Params[0], ParamsErr[0])
         OmegaTrap = _uncertainties.ufloat(Params[1], ParamsErr[1])
 
-        if MakeFig == True:
+        if MakeFig:
             return Gamma, OmegaTrap, fig, ax
         else:
             return Gamma, OmegaTrap, None, None
@@ -1368,9 +1406,9 @@ class DataObject():
             The axes object created showing the PSD of the filtered
             and unfiltered signal
         """
-        if timeStart == None:
+        if timeStart is None:
             timeStart = self.timeStart
-        if timeEnd == None:
+        if timeEnd is None:
             timeEnd = self.timeEnd
 
         time = self.time.get_array()
@@ -1406,7 +1444,7 @@ class DataObject():
             raise ValueError("filterImplementation must be one of [filtfilt, lfilter, ifft] you entered: {}".format(
                 filterImplementation))
 
-        if MakeFig == True:
+        if MakeFig:
             f, PSD = scipy.signal.welch(input_signal,
                                         SAMPLEFREQ,
                                         nperseg=NPerSegmentPSD)
@@ -1422,7 +1460,7 @@ class DataObject():
         else:
             fig = None
             ax = None
-        if show_fig == True:
+        if show_fig:
             _plt.show()
         timedata = time[StartIndex:EndIndex][0::FractionOfSampleFreq]
         return timedata, filteredData, fig, ax
@@ -1494,8 +1532,8 @@ class DataObject():
         JP : seaborn.jointplot object
             joint plot object containing the phase space plot
         """
-        if cmap == None:
-            if logscale == True:
+        if cmap is None:
+            if logscale:
                 cmap = properties['default_log_cmap']
             else:
                 cmap = properties['default_linear_cmap']
@@ -1530,13 +1568,13 @@ class DataObject():
 
         print("Plotting Phase Space")
 
-        if marginalColor == None:
+        if marginalColor is None:
             try:
                 marginalColor = tuple((cmap.colors[len(cmap.colors) / 2][:-1]))
             except AttributeError:
                 try:
                     marginalColor = cmap(2)
-                except:
+                except BaseException:
                     marginalColor = properties['default_base_color']
 
         if kind == "hex":  # gridsize can only be passed if kind="hex"
@@ -1564,16 +1602,19 @@ class DataObject():
                 **kwargs,
             )
         else:
-            JP1 = _sns.jointplot(_pd.Series(PosArray[1:], name="$z$ ({}) \n filepath=%s".format(units) % (self.filepath)),
-                                 _pd.Series(
-                                         VelArray / (2 * pi * freq), name="$v_z$/$\omega$ ({})".format(units)),
+            JP1 = _sns.jointplot(_pd.Series(PosArray[1:],
+                                            name="$z$ ({}) \n filepath=%s".format(units) % (self.filepath)),
+                                 _pd.Series(VelArray / (2 * pi * freq),
+                                            name="$v_z$/$\omega$ ({})".format(units)),
                                  stat_func=None,
-                                 xlim=[-_plotlimit, _plotlimit],
-                                 ylim=[-_plotlimit, _plotlimit],
+                                 xlim=[-_plotlimit,
+                                       _plotlimit],
+                                 ylim=[-_plotlimit,
+                                       _plotlimit],
                                  size=max(properties['default_fig_size']),
                                  kind=kind,
-                                 marginal_kws={
-                                     'hist_kws': {'log': logscale}, },
+                                 marginal_kws={'hist_kws': {'log': logscale},
+                                               },
                                  cmap=cmap,
                                  color=marginalColor,
                                  alpha=alpha,
@@ -1583,13 +1624,28 @@ class DataObject():
 
         fig = JP1.fig
 
-        if show_fig == True:
+        if show_fig:
             print("Showing Phase Space")
             _plt.show()
 
         return fig, JP1
 
-    def plot_phase_space(self, freq, ConvFactor, PeakWidth=10000, FractionOfSampleFreq=1, timeStart=None, timeEnd=None, PointsOfPadding=500, units="nm", show_fig=True, ShowPSD=False, xlabel='', ylabel='', *args, **kwargs):
+    def plot_phase_space(
+            self,
+            freq,
+            ConvFactor,
+            PeakWidth=10000,
+            FractionOfSampleFreq=1,
+            timeStart=None,
+            timeEnd=None,
+            PointsOfPadding=500,
+            units="nm",
+            show_fig=True,
+            ShowPSD=False,
+            xlabel='',
+            ylabel='',
+            *args,
+            **kwargs):
         unit_prefix = units[:-1]
 
         xlabel = xlabel + "({})".format(units)
@@ -1620,11 +1676,20 @@ class DataObject():
         axscatter.set_xlabel(xlabel)
         axscatter.set_ylabel(ylabel)
 
-        if show_fig == True:
+        if show_fig:
             _plt.show()
         return fig, axscatter, axhistx, axhisty, cb
 
-    def calc_phase_space(self, freq, ConvFactor, PeakWidth=10000, FractionOfSampleFreq=1, timeStart=None, timeEnd=None, PointsOfPadding=500, ShowPSD=False):
+    def calc_phase_space(
+            self,
+            freq,
+            ConvFactor,
+            PeakWidth=10000,
+            FractionOfSampleFreq=1,
+            timeStart=None,
+            timeEnd=None,
+            PointsOfPadding=500,
+            ShowPSD=False):
         """
         Calculates the position and velocity (in m) for use in plotting the phase space distribution.
 
@@ -1672,17 +1737,17 @@ class DataObject():
                                            timeStart=timeStart,
                                            timeEnd=timeEnd)
         time = self.time.get_array()
-        if timeStart != None:
+        if timeStart is not None:
             StartIndex = _np.where(time == take_closest(time, timeStart))[0][0]
         else:
             StartIndex = 0
-        if timeEnd != None:
+        if timeEnd is not None:
             EndIndex = _np.where(time == take_closest(time, timeEnd))[0][0]
         else:
             EndIndex = -1
 
-        Pos = Pos[PointsOfPadding: -PointsOfPadding+1]
-        time = time[StartIndex:EndIndex][::FractionOfSampleFreq][PointsOfPadding: -PointsOfPadding+1]
+        Pos = Pos[PointsOfPadding: -PointsOfPadding + 1]
+        time = time[StartIndex:EndIndex][::FractionOfSampleFreq][PointsOfPadding: -PointsOfPadding + 1]
 
         if type(ConvFactor) == _uncertainties.core.Variable:
             conv = ConvFactor.n
@@ -1746,7 +1811,16 @@ class ORGTableData():
         return Value
 
 
-def load_data(Filepath, ObjectType='data', RelativeChannelNo=None, SampleFreq=None, PointsToLoad=-1, calcPSD=True, NPerSegmentPSD=1000000, NormaliseByMonitorOutput=False, silent=False):
+def load_data(
+        Filepath,
+        ObjectType='data',
+        RelativeChannelNo=None,
+        SampleFreq=None,
+        PointsToLoad=-1,
+        calcPSD=True,
+        NPerSegmentPSD=1000000,
+        NormaliseByMonitorOutput=False,
+        silent=False):
     """
     Parameters
     ----------
@@ -1798,7 +1872,7 @@ def load_data(Filepath, ObjectType='data', RelativeChannelNo=None, SampleFreq=No
         that you requested to be loaded.
 
     """
-    if silent != True:
+    if not silent:
         print("Loading data from {}".format(Filepath))
     ObjectTypeDict = {
         'data': DataObject,
@@ -1815,7 +1889,7 @@ def load_data(Filepath, ObjectType='data', RelativeChannelNo=None, SampleFreq=No
                   NormaliseByMonitorOutput)
     try:
         channel_number, run_number, repeat_number = [
-            int(val) for val in re.findall('\d+', data.filename)
+            int(val) for val in re.findall(r'\d+', data.filename)
         ]
         data.channel_number = channel_number
         data.run_number = run_number
@@ -2149,7 +2223,7 @@ def fit_curvefit(p0, datax, datay, function, **kwargs):
     for i in range(len(pfit)):
         try:
             error.append(_np.absolute(pcov[i][i])**0.5)
-        except:
+        except BaseException:
             error.append(_np.NaN)
     pfit_curvefit = pfit
     perr_curvefit = _np.array(error)
@@ -2325,15 +2399,12 @@ def fit_autocorrelation(autocorrelation,
         AngTrapFreqGuess = 2 * _np.pi * TrapFreqGuess
         p0 = _np.array([GammaGuess, AngTrapFreqGuess])
 
-        Params_Fit, Params_Fit_Err = fit_curvefit(p0,
-                                                  datax,
-                                                  datay,
-                                                  _position_autocorrelation_fitting_eqn)
-        autocorrelation_fit = _position_autocorrelation_fitting_eqn(_np.arange(0, datax[-1], 1e-7),
-                                                                    Params_Fit[0],
-                                                                    Params_Fit[1])
+        Params_Fit, Params_Fit_Err = fit_curvefit(
+            p0, datax, datay, _position_autocorrelation_fitting_eqn)
+        autocorrelation_fit = _position_autocorrelation_fitting_eqn(
+            _np.arange(0, datax[-1], 1e-7), Params_Fit[0], Params_Fit[1])
 
-    if MakeFig == True:
+    if MakeFig:
         fig = _plt.figure(figsize=properties["default_fig_size"])
         ax = fig.add_subplot(111)
         ax.plot(datax * 1e6,
@@ -2355,7 +2426,7 @@ def fit_autocorrelation(autocorrelation,
         ax.set_ylabel(
             r"$\left | \frac{\langle x(t)x(t+\tau) \rangle}{\langle x(t)x(t) \rangle} \right |$"
         )
-        if show_fig == True:
+        if show_fig:
             _plt.show()
         return Params_Fit, Params_Fit_Err, fig, ax
     else:
@@ -2429,10 +2500,11 @@ def PSD_fitting_eqn2(A, OmegaTrap, Gamma, omega):
     Value : float
         The value of the fitting equation
     """
-    return A*Gamma / ((OmegaTrap**2 - omega**2)**2 + omega**2 * (Gamma)**2)
+    return A * Gamma / ((OmegaTrap**2 - omega**2)**2 + omega**2 * (Gamma)**2)
 
 
-def PSD_fitting_eqn_with_background(A, OmegaTrap, Gamma, FlatBackground, omega):
+def PSD_fitting_eqn_with_background(
+        A, OmegaTrap, Gamma, FlatBackground, omega):
     """
     The value of the fitting equation:
     A / ((OmegaTrap**2 - omega**2)**2 + (omega * Gamma)**2) + FlatBackground
@@ -2471,7 +2543,16 @@ def PSD_fitting_eqn_with_background(A, OmegaTrap, Gamma, FlatBackground, omega):
                 (Gamma)**2) + FlatBackground
 
 
-def fit_PSD(Data, bandwidth, TrapFreqGuess, AGuess=0.1e10, GammaGuess=400, FlatBackground=None, MakeFig=True, show_fig=True, plot_initial=True):
+def fit_PSD(
+        Data,
+        bandwidth,
+        TrapFreqGuess,
+        AGuess=0.1e10,
+        GammaGuess=400,
+        FlatBackground=None,
+        MakeFig=True,
+        show_fig=True,
+        plot_initial=True):
     """
     Fits theory PSD to Data. Assumes highest point of PSD is the
     trapping frequency.
@@ -2560,7 +2641,7 @@ def fit_PSD(Data, bandwidth, TrapFreqGuess, AGuess=0.1e10, GammaGuess=400, FlatB
                                   TrapFreq,
                                   BigGamma,
                                   FlatBackground=None):
-        if FlatBackground == None:
+        if FlatBackground is None:
             Theory_PSD = 10 * \
                 _np.log10(PSD_fitting_eqn(
                     A, TrapFreq, BigGamma, freqs))  # PSD in dB
@@ -2576,7 +2657,7 @@ def fit_PSD(Data, bandwidth, TrapFreqGuess, AGuess=0.1e10, GammaGuess=400, FlatB
     datax = AngFreqs[indx_fit_lower:indx_fit_upper]
     datay = logPSD[indx_fit_lower:indx_fit_upper]
 
-    if FlatBackground == None:
+    if FlatBackground is None:
         p0 = _np.array([AGuess, OmegaTrap, GammaGuess])
 
         Params_Fit, Params_Fit_Err = fit_curvefit(p0, datax, datay,
@@ -2587,11 +2668,11 @@ def fit_PSD(Data, bandwidth, TrapFreqGuess, AGuess=0.1e10, GammaGuess=400, FlatB
         Params_Fit, Params_Fit_Err = fit_curvefit(p0, datax, datay,
                                                   calc_theory_PSD_curve_fit)
 
-    if MakeFig == True:
+    if MakeFig:
         fig = _plt.figure(figsize=properties["default_fig_size"])
         ax = fig.add_subplot(111)
 
-        if FlatBackground == None:
+        if FlatBackground is None:
             PSDTheory_fit_initial = 10 * _np.log10(
                 PSD_fitting_eqn(p0[0], p0[1], p0[2], AngFreqs))
 
@@ -2636,7 +2717,7 @@ def fit_PSD(Data, bandwidth, TrapFreqGuess, AGuess=0.1e10, GammaGuess=400, FlatB
         frame.set_edgecolor('white')
         ax.set_xlabel("Frequency (Hz)")
         ax.set_ylabel("$S_{xx}$ ($V^2/Hz$)")
-        if show_fig == True:
+        if show_fig:
             _plt.show()
         return Params_Fit, Params_Fit_Err, fig, ax
     else:
@@ -2702,15 +2783,15 @@ def extract_parameters(Pressure,
     method = method.lower()
     if method == "rashid":
         radius = (0.619 * 9 * pi * eta * dm**2) / \
-                 (_np.sqrt(2) * rho * kB * T0) * (Pressure/Gamma0)
+                 (_np.sqrt(2) * rho * kB * T0) * (Pressure / Gamma0)
     # see section 4.1.1 of Muddassar Rashid's 2016 Thesis for
     # derivation of this
     # see also page 132 of Jan Giesler's Thesis
     m_air = 4.81e-26  # molecular mass of air is 28.97 g/mol and Avogadro's Number 6.0221409^23
     if method == "chang":
-        vbar = (8*kB*T0/(pi*m_air))**0.5
+        vbar = (8 * kB * T0 / (pi * m_air))**0.5
         # CORRECTION FACTOR OF 4 APPLIED!!!!
-        radius = 16/(rho*pi*vbar)*(Pressure/Gamma0)/4
+        radius = 16 / (rho * pi * vbar) * (Pressure / Gamma0) / 4
     err_radius = radius * \
         _np.sqrt(((PressureErr * Pressure) / Pressure)
                  ** 2 + (Gamma0Err / Gamma0)**2)
@@ -2837,9 +2918,9 @@ def get_ZXY_data(Data,
     timedata : ndarray
         Array containing the time data to go with the z, x, and y signal.
     """
-    if timeStart == None:
+    if timeStart is None:
         timeStart = Data.timeStart
-    if timeEnd == None:
+    if timeEnd is None:
         timeEnd = Data.timeEnd
 
     time = Data.time.get_array()
@@ -2886,7 +2967,7 @@ def get_ZXY_data(Data,
         raise ValueError(
             "Value Error: FractionOfSampleFreq must be higher, a sufficiently small sample frequency should be used to produce a working IIR filter.")
 
-    if MakeFig == True:
+    if MakeFig:
         f, PSD = scipy.signal.welch(
             input_signal, SAMPLEFREQ, nperseg=NPerSegmentPSD)
         f_z, PSD_z = scipy.signal.welch(
@@ -2906,7 +2987,7 @@ def get_ZXY_data(Data,
     else:
         fig = None
         ax = None
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     timedata = time[StartIndex:EndIndex][0::FractionOfSampleFreq]
     return zdata, xdata, ydata, timedata, fig, ax
@@ -2967,9 +3048,9 @@ def get_ZXY_data_IFFT(Data,
     timedata : ndarray
         Array containing the time data to go with the z, x, and y signal.
     """
-    if timeStart == None:
+    if timeStart is None:
         timeStart = Data.timeStart
-    if timeEnd == None:
+    if timeEnd is None:
         timeEnd = Data.timeEnd
 
     time = Data.time.get_array()
@@ -2990,7 +3071,7 @@ def get_ZXY_data_IFFT(Data,
     ydata = IFFT_filter(input_signal, SAMPLEFREQ, yf - ywidth / 2,
                         yf + ywidth / 2)
 
-    if show_fig == True:
+    if show_fig:
         NPerSegment = len(Data.time)
         if NPerSegment > 1e7:
             NPerSegment = int(1e7)
@@ -3189,9 +3270,9 @@ def animate_2Dscatter(x, y, NumAnimatedPoints=50, NTrailPoints=20,
                          y[0:NTrailPoints],
                          color=rgba_colors)
 
-    if xlims == None:
+    if xlims is None:
         xlims = (min(x), max(x))
-    if ylims == None:
+    if ylims is None:
         ylims = (min(y), max(y))
 
     ax.set_xlim(xlims)
@@ -3201,8 +3282,10 @@ def animate_2Dscatter(x, y, NumAnimatedPoints=50, NTrailPoints=20,
 
     def animate(i, scatter):
         scatter.axes.clear()  # clear old scatter object
-        scatter = ax.scatter(
-            x[i:i+NTrailPoints], y[i:i+NTrailPoints], color=rgba_colors, animated=True)
+        scatter = ax.scatter(x[i:i + NTrailPoints],
+                             y[i:i + NTrailPoints],
+                             color=rgba_colors,
+                             animated=True)
         # create new scatter with updated data
         ax.set_xlim(xlims)
         ax.set_ylim(ylims)
@@ -3233,9 +3316,9 @@ def animate_2Dscatter_slices(x, y, NumAnimatedPoints=50,
 
     scatter = ax.scatter(x[0], y[0])
 
-    if xlims == None:
+    if xlims is None:
         xlims = (_np.min(x), _np.max(x))
-    if ylims == None:
+    if ylims is None:
         ylims = (_np.min(y), _np.max(y))
 
     ax.set_xlim(xlims)
@@ -3288,7 +3371,7 @@ def IFFT_filter(Signal, SampleFreq, lowerFreq, upperFreq, PyCUDA=False):
     FilteredData : ndarray
         Array containing the filtered data
     """
-    if PyCUDA == True:
+    if PyCUDA:
         Signalfft = calc_fft_with_PyCUDA(Signal)
     else:
         print("starting fft")
@@ -3298,7 +3381,7 @@ def IFFT_filter(Signal, SampleFreq, lowerFreq, upperFreq, PyCUDA=False):
     print("starting bin zeroing")
     Signalfft[_np.where(freqs < lowerFreq)] = 0
     Signalfft[_np.where(freqs > upperFreq)] = 0
-    if PyCUDA == True:
+    if PyCUDA:
         FilteredSignal = 2 * calc_ifft_with_PyCUDA(Signalfft)
     else:
         print("starting ifft")
@@ -3457,8 +3540,8 @@ def make_butterworth_bandpass_b_a(CenterFreq,
         coefficients multiplying the past outputs (feedback coefficients)
     """
 
-    lowcut = CenterFreq-bandwidth/2
-    highcut = CenterFreq+bandwidth/2
+    lowcut = CenterFreq - bandwidth / 2
+    highcut = CenterFreq + bandwidth / 2
     b, a = make_butterworth_b_a(lowcut, highcut, SampleFreq, order, btype)
     return b, a
 
@@ -3584,7 +3667,7 @@ def get_freq_response(a,
         ax1.set_xlabel("frequency (Hz)")
     ax1.set_ylabel("Gain (dB)")
     ax1.set_xlim([0, SampleFreq / 2.0])
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     fig2 = _plt.figure()
     ax2 = fig2.add_subplot(111)
@@ -3598,7 +3681,7 @@ def get_freq_response(a,
 
     ax2.set_ylabel("Phase Difference")
     ax2.set_xlim([0, SampleFreq / 2.0])
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     return freqList, GainArray, PhaseDiffArray, fig1, ax1, fig2, ax2
 
@@ -3660,8 +3743,14 @@ def multi_plot_PSD(DataArray,
     ax = fig.add_subplot(111)
 
     for i, data in enumerate(DataArray):
-        ax.semilogy(unit_conversion(data.freqs, unit_prefix), data.PSD,
-                    label=LabelArray[i], color=ColorArray[i], alpha=alphaArray[i])
+        ax.semilogy(
+            unit_conversion(
+                data.freqs,
+                unit_prefix),
+            data.PSD,
+            label=LabelArray[i],
+            color=ColorArray[i],
+            alpha=alphaArray[i])
 
     ax.set_xlabel("Frequency ({})".format(units))
     ax.set_xlim(xlim)
@@ -3674,7 +3763,7 @@ def multi_plot_PSD(DataArray,
 
     _plt.title('filedir=%s' % (DataArray[0].filedir))
 
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     return fig, ax
 
@@ -3729,9 +3818,9 @@ def multi_plot_time(DataArray,
                 alpha=0.8,
                 label=LabelArray[i])
     ax.set_xlabel("time (s)")
-    if xlim != None:
+    if xlim is not None:
         ax.set_xlim(xlim)
-    if ylim != None:
+    if ylim is not None:
         ax.set_ylim(ylim)
     ax.grid(which="major")
     legend = ax.legend(loc="best", frameon=1)
@@ -3740,7 +3829,7 @@ def multi_plot_time(DataArray,
     frame.set_edgecolor('white')
 
     ax.set_ylabel("voltage (V)")
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     return fig, ax
 
@@ -3800,11 +3889,11 @@ def multi_subplots_time(DataArray,
         axs[i].grid(which="major")
         axs[i].legend(loc="best")
         axs[i].set_ylabel("voltage (V)")
-        if xlim != None:
+        if xlim is not None:
             axs[i].set_xlim(xlim)
-        if ylim != None:
+        if ylim is not None:
             axs[i].set_ylim(ylim)
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     return fig, axs
 
@@ -3847,26 +3936,35 @@ def arrange_plots_on_one_canvas(FigureAxTupleArray,
             for i in _np.arange(0, len(FigureAxTupleArray), 1)
         ]
     SingleFigSize = FigureAxTupleArray[0][0].get_size_inches()
-    combinedFig = _plt.figure(figsize=(number_of_columns * SingleFigSize[0],
-                                       _np.ceil(len(FigureAxTupleArray) / number_of_columns) *
-                                       SingleFigSize[1]))
+    combinedFig = _plt.figure(
+        figsize=(
+            number_of_columns *
+            SingleFigSize[0],
+            _np.ceil(
+                len(FigureAxTupleArray) /
+                number_of_columns) *
+            SingleFigSize[1]))
     for index in range(len(FigureAxTupleArray)):
         individualPlot = FigureAxTupleArray[index]
         individualPlot[0].set_size_inches(
-            (number_of_columns * SingleFigSize[0],
-             _np.ceil(len(FigureAxTupleArray) / number_of_columns) * SingleFigSize[1]))
+            (number_of_columns *
+             SingleFigSize[0],
+             _np.ceil(
+                 len(FigureAxTupleArray) /
+                 number_of_columns) *
+                SingleFigSize[1]))
         ax = individualPlot[1]
         ax.set_title(SubtitleArray[index])
         ax.remove()
         ax.figure = combinedFig
-        ax.change_geometry(int(_np.ceil(len(FigureAxTupleArray) / number_of_columns)), number_of_columns,
-                           1 + index)
+        ax.change_geometry(int(_np.ceil(
+            len(FigureAxTupleArray) / number_of_columns)), number_of_columns, 1 + index)
         combinedFig.axes.append(ax)
         combinedFig.add_axes(ax)
         # _plt.close(individualPlot[0])
     combinedFig.subplots_adjust(hspace=.4)
     combinedFig.suptitle(title)
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     return combinedFig
 
@@ -3934,19 +4032,19 @@ def calc_autocorrelation(Signal, FFT=False, PyCUDA=False):
             Array containing the value of the autocorrelation evaluated
             at the corresponding amount of shifted array-index.
     """
-    if FFT == True:
+    if FFT:
         Signal_padded = scipy.fftpack.ifftshift(
             (Signal - _np.average(Signal)) / _np.std(Signal))
         n, = Signal_padded.shape
         Signal_padded = _np.r_[Signal_padded[:n // 2],
                                _np.zeros_like(Signal_padded
                                               ), Signal_padded[n // 2:]]
-        if PyCUDA == True:
+        if PyCUDA:
             f = calc_fft_with_PyCUDA(Signal_padded)
         else:
             f = scipy.fftpack.fft(Signal_padded)
         p = _np.absolute(f)**2
-        if PyCUDA == True:
+        if PyCUDA:
             autocorr = calc_ifft_with_PyCUDA(p)
         else:
             autocorr = scipy.fftpack.ifft(p)
@@ -4110,7 +4208,7 @@ def count_collisions(Collisions):
     CollisionIndicies = []
     lastval = True
     for i, val in enumerate(Collisions):
-        if val == True and lastval == False:
+        if val and lastval == False:
             CollisionIndicies.append(i)
             CollisionCount += 1
         lastval = val
@@ -4198,11 +4296,11 @@ def plot_3d_dist(Z,
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
     zlim = ax.get_zlim()
-    if LowLim != None:
+    if LowLim is not None:
         lowLim = LowLim - AxisOffset
     else:
         lowLim = min([xlim[0], ylim[0], zlim[0]]) - AxisOffset
-    if HighLim != None:
+    if HighLim is not None:
         highLim = HighLim + AxisOffset
     else:
         highLim = max([xlim[1], ylim[1], zlim[1]]) + AxisOffset
@@ -4240,7 +4338,7 @@ def plot_3d_dist(Z,
     zflat = _np.full_like(yy, zpos)
     p = ax.plot_surface(xx, yy, zflat, facecolors=normalized_map,
                         rstride=1, cstride=1, shade=False)
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     return fig, ax
 
@@ -4284,7 +4382,7 @@ def multi_plot_3d_dist(ZXYData,
         raise ValueError(
             "Parameter ZXYData should be an array of length-3 arrays containing arrays of Z, X and Y data"
         )
-    if ColorArray != None:
+    if ColorArray is not None:
         if ZXYData.shape[0] != len(ColorArray):
             raise ValueError(
                 "Parameter ColorArray should be the same lenth as ZXYData")
@@ -4295,7 +4393,8 @@ def multi_plot_3d_dist(ZXYData,
         if ZXYData.shape[0] > len(ColorArray):
 
             raise NotImplementedError(
-                "Only {} datasets can be plotted with automatic colors".format(len(ColorArray)))
+                "Only {} datasets can be plotted with automatic colors".format(
+                    len(ColorArray)))
 
     angle = Angle
     fig = _plt.figure(figsize=(8, 6))
@@ -4310,11 +4409,11 @@ def multi_plot_3d_dist(ZXYData,
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
     zlim = ax.get_zlim()
-    if LowLim != None:
+    if LowLim is not None:
         lowLim = LowLim - AxisOffset
     else:
         lowLim = min([xlim[0], ylim[0], zlim[0]]) - AxisOffset
-    if HighLim != None:
+    if HighLim is not None:
         highLim = HighLim + AxisOffset
     else:
         highLim = max([xlim[1], ylim[1], zlim[1]]) + AxisOffset
@@ -4362,12 +4461,12 @@ def multi_plot_3d_dist(ZXYData,
     ax.set_zlabel("y")
     ax.view_init(30, angle)
 
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     return fig, ax
 
 
-# ------ Functions for extracting mass via potential comparision ---------------
+# ------ Functions for extracting mass via potential comparision ---------
 
 def steady_state_potential(xdata, HistBins=100):
     """
@@ -4397,10 +4496,10 @@ def steady_state_potential(xdata, HistBins=100):
     pops = _np.histogram(xdata, HistBins)[0]
     bins = _np.histogram(xdata, HistBins)[1]
     bins = bins[0:-1]
-    bins = bins+_np.mean(_np.diff(bins))
+    bins = bins + _np.mean(_np.diff(bins))
 
     # normalise pops
-    pops = pops/float(_np.sum(pops))
+    pops = pops / float(_np.sum(pops))
 
     return bins, -_np.log(pops)
 
@@ -4504,7 +4603,7 @@ def fit_radius_from_potentials(z,
     SpringPotnlFunc = dynamical_potential(z, dt)
     SpringPotnl = SpringPotnlFunc(z)
 
-    kBT_Gamma = temp*boltzmann*1/Damping
+    kBT_Gamma = temp * boltzmann * 1 / Damping
 
     DynamicPotentialFunc = make_dynamical_potential_func(
         kBT_Gamma, density, SpringPotnlFunc)
@@ -4515,9 +4614,9 @@ def fit_radius_from_potentials(z,
     perr = _np.sqrt(_np.diag(pcov))
     Radius, RadiusError = popt[0], perr[0]
 
-    mass = ((4/3)*pi*((Radius*10**-9)**3))*density
-    yfit = (kBT_Gamma/mass)
-    Y = yfit*SpringPotnl
+    mass = ((4 / 3) * pi * ((Radius * 10**-9)**3)) * density
+    yfit = (kBT_Gamma / mass)
+    Y = yfit * SpringPotnl
 
     fig, ax = _plt.subplots()
     ax.plot(SteadyStatePotnl[0],
@@ -4529,7 +4628,7 @@ def fit_radius_from_potentials(z,
     ax.set_ylabel('U ($k_{B} T $ Joules)')
     ax.set_xlabel('Distance (mV)')
     _plt.tight_layout()
-    if show_fig == True:
+    if show_fig:
         _plt.show()
     return Radius * 1e-9, RadiusError * 1e-9, fig, ax
 
@@ -4720,9 +4819,9 @@ def get_time_slice(time, z, zdot=None, timeStart=None, timeEnd=None):
         None if zdot not provided
 
     """
-    if timeStart == None:
+    if timeStart is None:
         timeStart = time[0]
-    if timeEnd == None:
+    if timeEnd is None:
         timeEnd = time[-1]
 
     StartIndex = _np.where(time == take_closest(time, timeStart))[0][0]
@@ -4731,7 +4830,7 @@ def get_time_slice(time, z, zdot=None, timeStart=None, timeEnd=None):
     time_sliced = time[StartIndex:EndIndex]
     z_sliced = z[StartIndex:EndIndex]
 
-    if zdot != None:
+    if zdot is not None:
         zdot_sliced = zdot[StartIndex:EndIndex]
     else:
         zdot_sliced = None
@@ -4835,7 +4934,7 @@ def audiate(signal, AudioSampleFreq, filename):
     return None
 
 
-# ----------------- WIGNER FUNCTIONS -------------------------------------------------------------
+# ----------------- WIGNER FUNCTIONS -------------------------------------
 
 
 def extract_slices(z, freq, sample_freq, show_plot=False):
@@ -4879,22 +4978,22 @@ def extract_slices(z, freq, sample_freq, show_plot=False):
     phase = _np.linspace(-180, 180,
                          period_samples)  # phase assigned to samples
 
-    if show_plot == True:
+    if show_plot:
         fig, ax = _plt.subplots()
 
-    for i in range(number_of_oscillations-1):
+    for i in range(number_of_oscillations - 1):
         # loops through number of oscillations - 1 pulling out period_samples
         # slices and assigning them a phase from -180 to 180 degrees
         start = i * period_samples  # start index of section
         end = (i + 1) * period_samples  # end index of section
-        if show_plot == True:
+        if show_plot:
             _plt.plot(phase, z[start:end])
         # enter z section as ith row
         phase_slices_untransposed[i] = z[start:end]
 
     phase_slices = phase_slices_untransposed.transpose()  # swap rows and columns
 
-    if show_plot == True:
+    if show_plot:
         _plt.show()
     return phase, phase_slices
 
@@ -4936,7 +5035,7 @@ def histogram_phase(phase_slices, phase, histbins=200, show_plot=False):
     counts_array = _np.array(counts_array)
     counts_array_transposed = _np.transpose(counts_array).astype(float)
 
-    if show_plot == True:
+    if show_plot:
         fig = _plt.figure(figsize=(12, 6))
         ax = fig.add_subplot(111)
         ax.set_title('Phase Distribution')
@@ -5155,8 +5254,17 @@ def plot_wigner2d(iradon_output,
     return fig, axWigner, axHistx, axHisty, cbar
 
 
-def fit_data(freq_array, S_xx_array, AGuess, OmegaTrap, GammaGuess, freq_range=None, make_fig=True, show_fig=True, **kwargs):
-    if freq_range != None:
+def fit_data(
+        freq_array,
+        S_xx_array,
+        AGuess,
+        OmegaTrap,
+        GammaGuess,
+        freq_range=None,
+        make_fig=True,
+        show_fig=True,
+        **kwargs):
+    if freq_range is not None:
         StartIndex = list(freq_array).index(
             freq_array[freq_array >= freq_range[0]][0])
         EndIndex = list(freq_array).index(
@@ -5182,14 +5290,13 @@ def fit_data(freq_array, S_xx_array, AGuess, OmegaTrap, GammaGuess, freq_range=N
 
     p0 = _np.array([AGuess, OmegaTrap, GammaGuess])
 
-
-   Params_Fit, Params_Fit_Err = fit_curvefit(p0,
+    Params_Fit, Params_Fit_Err = fit_curvefit(p0,
                                               datax,
                                               datay,
                                               calc_theory_PSD_curve_fit,
                                               **kwargs)
 
-   if make_fig == True:
+    if make_fig:
         fig = _plt.figure(figsize=properties["default_fig_size"])
         ax = fig.add_subplot(111)
 
@@ -5220,26 +5327,34 @@ def fit_data(freq_array, S_xx_array, AGuess, OmegaTrap, GammaGuess, freq_range=N
         frame.set_edgecolor('white')
         ax.set_xlabel("Frequency (Hz)")
         ax.set_ylabel("$S_{xx}$ ($V^2/Hz$)")
-        if show_fig == True:
+        if show_fig:
             _plt.show()
         return Params_Fit, Params_Fit_Err, fig, ax
     else:
         return Params_Fit, Params_Fit_Err, None, None
 
 
-def fit_data_2(freq_array, S_xx_array, AGuess, OmegaTrap, GammaGuess, make_fig=True, show_fig=True):
+def fit_data_2(
+        freq_array,
+        S_xx_array,
+        AGuess,
+        OmegaTrap,
+        GammaGuess,
+        make_fig=True,
+        show_fig=True):
 
     logPSD = 10 * _np.log10(S_xx_array)  # putting S_xx in dB
 
     def calc_theory_PSD_curve_fit(freqs, A, TrapFreq, BigGamma):
         Theory_PSD = 10 * \
-            _np.log10(PSD_fitting_eqn2(A, TrapFreq, BigGamma, freqs))  # PSD in dB
+            _np.log10(PSD_fitting_eqn2(
+                A, TrapFreq, BigGamma, freqs))  # PSD in dB
         if A < 0 or TrapFreq < 0 or BigGamma < 0:
             return 1e9
         else:
             return Theory_PSD
 
-    datax = _np.array(freq_array)*(2*_np.pi)  # angular frequency
+    datax = _np.array(freq_array) * (2 * _np.pi)  # angular frequency
     datay = logPSD  # S_xx data in dB
 
     p0 = _np.array([AGuess, OmegaTrap, GammaGuess])
@@ -5249,7 +5364,7 @@ def fit_data_2(freq_array, S_xx_array, AGuess, OmegaTrap, GammaGuess, make_fig=T
                                               datay,
                                               calc_theory_PSD_curve_fit)
 
-    if make_fig == True:
+    if make_fig:
         fig = _plt.figure(figsize=properties["default_fig_size"])
         ax = fig.add_subplot(111)
 
@@ -5270,21 +5385,25 @@ def fit_data_2(freq_array, S_xx_array, AGuess, OmegaTrap, GammaGuess, make_fig=T
         ax.plot(datax / (2 * pi), PSDTheory_fit,
                 color="red", label="fitted vals")
         ax.semilogy()
-        legend = ax.legend(loc="best", frameon= 1)
+        legend = ax.legend(loc="best", frameon=1)
         frame = legend.get_frame()
         frame.set_facecolor('white')
         frame.set_edgecolor('white')
         ax.set_xlabel("Frequency (Hz)")
         ax.set_ylabel("$S_{xx}$ ($V^2/Hz$)")
-        if show_fig == True:
+        if show_fig:
             _plt.show()
         return Params_Fit, Params_Fit_Err, fig, ax
     else:
         return Params_Fit, Params_Fit_Err, None, None
 
 
-def calc_reduced_chi_squared(y_observed, y_model, observation_error, number_of_fitted_parameters):
-   """
+def calc_reduced_chi_squared(
+        y_observed,
+        y_model,
+        observation_error,
+        number_of_fitted_parameters):
+    """
     Calculates the reduced chi-squared, used to compare a model to observations. For example can be used to calculate how good a fit is by using fitted y values for y_model along with observed y values and error in those y values. Reduced chi-squared should be close to 1 for a good fit, lower than 1 suggests you are overestimating the measurement error (observation_error you entered is higher than the true error in the measurement). A value higher than 1 suggests either your model is a bad fit OR you are underestimating the error in the measurement (observation_error you entered is lower than the true error in the measurement). See https://en.wikipedia.org/wiki/Reduced_chi-squared_statistic for more detail.
 
     Parameters
@@ -5309,10 +5428,12 @@ def calc_reduced_chi_squared(y_observed, y_model, observation_error, number_of_f
         raise ValueError(
             "y_observed should have same number of elements as y_model")
     residuals = (observed - expected)
-    z = residuals / observation_error  # residuals divided by known error in measurement
+    # residuals divided by known error in measurement
+    z = residuals / observation_error
     chi2 = _np.sum(z**2)  # chi squared value
     num_of_observations = len(observed)
-    v = num_of_observations - number_of_fitted_parameters  # v = number of degrees of freedom
+    # v = number of degrees of freedom
+    v = num_of_observations - number_of_fitted_parameters
     chi2_reduced = chi2 / v
     return chi2_reduced
 
@@ -5329,19 +5450,20 @@ def fit_to_ringdown(time, signal, time_start, time_stop, Gamma_guess):
     start_of_slice = t_slice[0]
     t_slice = t_slice - start_of_slice  # shift 0 point of time to start of slice
 
-    fitfn = lambda t, A,Gamma: A*_np.exp(-Gamma/2*t)
+    def fitfn(t, A, Gamma): return A * _np.exp(-Gamma / 2 * t)
 
     A_guess = max(Htransx_slice)
 
-    result = _curve_fit(fitfn,  t_slice,  Htransx_slice, p0=[A_guess, Gamma_guess])
+    result = _curve_fit(fitfn, t_slice, Htransx_slice,
+                        p0=[A_guess, Gamma_guess])
     A, Gamma = result[0]
-    A_err = result[1][0, 0]**0.5    
+    A_err = result[1][0, 0]**0.5
     Gamma_err = result[1][1, 1]**0.5
     A_Ufloat = _uncertainties.ufloat(A, A_err)
     Gamma_Ufloat = _uncertainties.ufloat(Gamma, Gamma_err)
 
     fig, ax = _plt.subplots()
-    ax.plot(t_slice,  x_slice)
-    ax.plot(t_slice,  Htransx_slice)
+    ax.plot(t_slice, x_slice)
+    ax.plot(t_slice, Htransx_slice)
     ax.plot(t_slice, fitfn(t_slice, A, Gamma))
     return Gamma_Ufloat, A_Ufloat, fig, ax, t_slice, x_slice, Htransx_slice
