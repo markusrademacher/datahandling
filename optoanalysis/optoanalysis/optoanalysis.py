@@ -300,7 +300,7 @@ class DataObject():
                                                 dtype='int16',
                                                 count=PointsToLoad)
                 else:
-                    vRange = channelInputRanges[rangeList[0]]/1000
+                    vRange = channelInputRanges[int(rangeList[0])]/1000
                     bufferADC = _np.fromfile(self.filepath,
                                              dtype='int16',
                                              count=PointsToLoad)
@@ -313,7 +313,8 @@ class DataObject():
                     self.voltage = filedata[RelativeChannelNo:len(filedata):
                                             NumberOfChannels]
                 else:
-                    vRange = channelInputRanges[rangeList[RelativeChannelNo]]/1000
+                    vRange = channelInputRanges[int(
+                        rangeList[RelativeChannelNo])]/1000
                     bufferADC = filedata[RelativeChannelNo:len(filedata):
                                          NumberOfChannels]
                     self.voltage = bufferADC * vRange / maxADC
