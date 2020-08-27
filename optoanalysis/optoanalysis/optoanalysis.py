@@ -275,7 +275,8 @@ class DataObject():
                             self.filepath.replace(self.filename, '') +
                             "streaming_parameter.log", 'r'):
                         filename, sample_frequency, number_of_channels, rangeList, maxADC = line.split(
-                            ',')[0:]
+                            ';')[0:]
+                        rangeList = rangeList[1:-1].split(',')
                         if self.filename == filename:
                             if SampleFreq is None:
                                 SampleFreq = float(sample_frequency)
@@ -303,7 +304,7 @@ class DataObject():
                     bufferADC = _np.fromfile(self.filepath,
                                              dtype='int16',
                                              count=PointsToLoad)
-                    self.voltage = bufferADC * vRange / maxADC.value
+                    self.voltage = bufferADC * vRange / maxADC
             elif RelativeChannelNo is not None:
                 filedata = _np.fromfile(self.filepath,
                                         dtype='int16',
@@ -315,7 +316,7 @@ class DataObject():
                     vRange = channelInputRanges[rangeList[RelativeChannelNo]]/1000
                     bufferADC = filedata[RelativeChannelNo:len(filedata):
                                          NumberOfChannels]
-                    self.voltage = bufferADC * vRange / maxADC.value
+                    self.voltage = bufferADC * vRange / maxADC
             timeParams = (0, (len(self.voltage) - 1) / SampleFreq,
                           1 / SampleFreq)
             self.SampleFreq = 1 / timeParams[2]
