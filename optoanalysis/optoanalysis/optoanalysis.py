@@ -264,6 +264,8 @@ class DataObject():
                 raw, RelativeChannelNo)
             self.SampleFreq = 1 / timeParams[2]
         elif FileExtension == "bin":
+            rangeList = None
+            maxADC = None
             try:
                 if _does_file_exist(
                         self.filepath.replace(self.filename, '') +
@@ -272,7 +274,7 @@ class DataObject():
                     for line in open(
                             self.filepath.replace(self.filename, '') +
                             "streaming_parameter.log", 'r'):
-                        filename, sample_frequency, number_of_channels = line.split(
+                        filename, sample_frequency, number_of_channels, rangeList, maxADC = line.split(
                             ',')[0:]
                         if self.filename == filename:
                             if SampleFreq is None:
@@ -289,16 +291,31 @@ class DataObject():
                 raise ValueError(
                     "If loading a .bin file from the Picoscope you must enter a NumberOfChannels"
                 )
+            channelInputRanges = _np.array(
+                [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000])
             if RelativeChannelNo is None:
-                self.voltage = _np.fromfile(self.filepath,
-                                            dtype='int16',
-                                            count=PointsToLoad)
+                if rangeList == None and maxADC == None:
+                    self.voltage = _np.fromfile(self.filepath,
+                                                dtype='int16',
+                                                count=PointsToLoad)
+                else:
+                    vRange = channelInputRanges[rangeList[0]]/1000
+                    bufferADC = _np.fromfile(self.filepath,
+                                             dtype='int16',
+                                             count=PointsToLoad)
+                    self.voltage = bufferADC * vRange / maxADC.value
             elif RelativeChannelNo is not None:
                 filedata = _np.fromfile(self.filepath,
                                         dtype='int16',
                                         count=PointsToLoad)
-                self.voltage = filedata[RelativeChannelNo:len(filedata):
-                                        NumberOfChannels]
+                if rangeList == None and maxADC == None:
+                    self.voltage = filedata[RelativeChannelNo:len(filedata):
+                                            NumberOfChannels]
+                else:
+                    vRange = channelInputRanges[rangeList[RelativeChannelNo]]/1000
+                    bufferADC = filedata[RelativeChannelNo:len(filedata):
+                                         NumberOfChannels]
+                    self.voltage = bufferADC * vRange / maxADC.value
             timeParams = (0, (len(self.voltage) - 1) / SampleFreq,
                           1 / SampleFreq)
             self.SampleFreq = 1 / timeParams[2]
