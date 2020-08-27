@@ -304,7 +304,7 @@ class DataObject():
                     bufferADC = _np.fromfile(self.filepath,
                                              dtype='int16',
                                              count=PointsToLoad)
-                    self.voltage = bufferADC * vRange / maxADC
+                    self.voltage = bufferADC * vRange / int(maxADC)
             elif RelativeChannelNo is not None:
                 filedata = _np.fromfile(self.filepath,
                                         dtype='int16',
@@ -317,7 +317,7 @@ class DataObject():
                         rangeList[RelativeChannelNo])]/1000
                     bufferADC = filedata[RelativeChannelNo:len(filedata):
                                          NumberOfChannels]
-                    self.voltage = bufferADC * vRange / maxADC
+                    self.voltage = bufferADC * vRange / int(maxADC)
             timeParams = (0, (len(self.voltage) - 1) / SampleFreq,
                           1 / SampleFreq)
             self.SampleFreq = 1 / timeParams[2]
