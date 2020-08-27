@@ -1833,6 +1833,7 @@ def load_data(
         ObjectType='data',
         RelativeChannelNo=None,
         SampleFreq=None,
+        NumberOfChannels=None,
         PointsToLoad=-1,
         calcPSD=True,
         NPerSegmentPSD=1000000,
