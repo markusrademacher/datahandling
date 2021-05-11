@@ -1258,6 +1258,125 @@ class DataObject():
         else:
             return Gamma, OmegaTrap, None, None
 
+    def calc_gamma_from_RSquaredPSD_fit(self,
+                                        GammaGuess=None,
+                                        CutOffFreq=None,
+                                        FreqTrapGuess=None,
+                                        FractionOfSampleFreq=1,
+                                        NPerSegmentPSD=None,
+                                        Fit_xlim=None,
+                                        silent=False,
+                                        MakeFig=True,
+                                        show_fig=True):
+        """
+        Calculates the total damping, i.e. Gamma, by calculating the RSquared
+        PSD of the position-time trace. The RSquared is fitted with the R^2
+        function. The methodology is explained in the following paper
+        (DOI: 10.1103/PhysRevResearch.2.023349) and the function returns the
+        parameters with errors.
+
+        Parameters
+        ----------
+        GammaGuess : float, optional
+            Inital guess for BigGamma in Radians
+        CutOffFreq : float, optional
+            is the cut off frequncy to get rid of the 2*omega component, make
+            this several times larger than your linewidth, in Hz
+        FreqTrapGuess : float, optional
+            Inital guess for the trapping Frequency in Hz
+        FractionOfSampleFreq : integer, optional
+            The fraction of the sample frequency to sub-sample the data by.
+            This sometimes needs to be done because a filter with the
+            appropriate frequency response may not be generated using the
+            sample rate at which the data was taken. Increasing this number
+            means the R Squared signal produced by this function will be
+            sampled at a lower rate but a higher number means a higher chance
+            that the filter produced will have a nice frequency response.
+        NPerSegmentPSD : int, optional
+            NPerSegment to pass to scipy.signal.welch to calculate the PSD
+            default = 100/BigGamma*SampleFreq
+        Fit_xlim : float, optional
+            limits the R Squared PSD signal used for the fit function,
+            default = 0.75 * CutOffFreq
+        silent : bool, optional
+            Whether it prints the values fitted or is silent.
+        MakeFig : bool, optional
+            Whether to construct and return the figure object showing
+            the fitting. defaults to True
+        show_fig : bool, optional
+            Whether to show the figure object when it has been created.
+            defaults to True
+
+        Returns
+        -------
+        Gamma : ufloat
+            Big Gamma, the total damping in radians
+        fig : matplotlib.figure.Figure object
+            The figure object created showing the autocorrelation
+            of the data with the fit
+        ax : matplotlib.axes.Axes object
+            The axes object created showing the autocorrelation
+            of the data with the fit
+
+        """
+        if GammaGuess is None:
+            Gamma_Initial = self.Gamma.n
+        else:
+            Gamma_Initial = GammaGuess
+        if CutOffFreq is None:
+            CutOffFreq = 3 * Gamma_Initial/2/_np.pi
+        if FreqTrapGuess is None:
+            FreqTrap_Initial = self.FTrap.n
+        else:
+            FreqTrap_Initial = FreqTrapGuess
+        if NPerSegmentPSD is None:
+            NPerSegmentPSD = 100/Gamma_Initial*self.SampleFreq
+        if Fit_xlim is None:
+            Fit_xlim = 0.75*CutOffFreq
+        if round(FreqTrap_Initial / (Gamma_Initial / 2 / _np.pi)) < 10:
+            print('Q-factor < 10: method is unsuitable to determine Gamma')
+
+        time = self.time.get_array()
+        RSquared = calc_RSquared(time,
+                                 self.voltage,
+                                 self.SampleFreq,
+                                 FreqTrap_Initial,
+                                 CutOffFreq,
+                                 FractionOfSampleFreq)
+        RSquared_freqs, RSquared_PSD = calc_PSD(RSquared, self.SampleFreq /
+                                                FractionOfSampleFreq,
+                                                NPerSegment=NPerSegmentPSD)
+
+        if MakeFig:
+            Params, ParamsErr, fig, ax = fit_RSquared_PSD(RSquared_PSD,
+                                                          RSquared_freqs,
+                                                          Gamma_Initial,
+                                                          CutOffFreq,
+                                                          Fit_xlim,
+                                                          MakeFig=MakeFig,
+                                                          show_fig=show_fig)
+        else:
+            Params, ParamsErr, _, _ = fit_RSquared_PSD(RSquared_PSD,
+                                                       RSquared_freqs,
+                                                       Gamma_Initial,
+                                                       CutOffFreq,
+                                                       Fit_xlim,
+                                                       MakeFig=MakeFig,
+                                                       show_fig=show_fig)
+
+        if not silent:
+            print("\n")
+
+            print(
+                "Big Gamma: {} +- {}% ".format(Params[1], ParamsErr[1] / Params[1] * 100))
+
+        Gamma = _uncertainties.ufloat(Params[1], ParamsErr[1])
+
+        if MakeFig:
+            return Gamma, fig, ax
+        else:
+            return Gamma, None, None
+
     def extract_parameters(self, P_mbar, P_Error, method="chang"):
         """
         Extracts the Radius, mass and Conversion factor for a particle.
@@ -2446,6 +2565,135 @@ def fit_autocorrelation(autocorrelation,
         ax.set_ylabel(
             r"$\left | \frac{\langle x(t)x(t+\tau) \rangle}{\langle x(t)x(t) \rangle} \right |$"
         )
+        if show_fig:
+            _plt.show()
+        return Params_Fit, Params_Fit_Err, fig, ax
+    else:
+        return Params_Fit, Params_Fit_Err, None, None
+
+
+def _RSquared_PSD_fitting_eqn(Omega, Area, Gamma):
+    """
+    The value of the fitting equation:
+    Area / Gamma / (Omega**2 + Gamma**2)
+    to be fit to the R Squared PSD signal, taken from equation 3 of paper
+    (DOI: 10.1103/PhysRevResearch.2.023349).
+
+    Parameters
+    ----------
+    Omega : float
+        frequency in Radians
+    Gamma : float
+        Big Gamma (in Radians), i.e. damping
+
+    Returns
+    -------
+    Value : float
+        The value of the fitting equation
+    """
+    return Area / Gamma / (Omega**2 + Gamma**2)
+
+
+def fit_RSquared_PSD(RSquared_PSD,
+                     RSquared_freqs,
+                     GammaGuess,
+                     CutOffFreq,
+                     Fit_xlim,
+                     MakeFig=True,
+                     show_fig=True):
+    """
+    Fits equation 3 of paper (DOI: 10.1103/PhysRevResearch.2.023349) to the
+    computed PSD of the R Squared signal and returns the parameters with
+    errors.
+
+    Parameters
+    ----------
+    RSquared_PSD : array
+        array containing PSD of the R Squared signal to be fitted
+    RSquared_freqs : array
+        array containing the frequencies of each point the PSD of the RSquared
+        signal was computed
+    GammaGuess : float
+        The approximate Big Gamma (in radians) to use initially
+    CutOffFreq : float
+        is the cut off frequency applied via a lowpass filter when calculating
+        the R Squared signal
+    Fit_xlim : float, optional
+        limits the R Squared PSD signal used for the fit function
+    MakeFig : bool, optional
+        Whether to construct and return the figure object showing
+        the fitting. defaults to True
+    show_fig : bool, optional
+        Whether to show the figure object when it has been created.
+        defaults to True
+
+    Returns
+    -------
+    ParamsFit - Fitted parameters:
+        [Area, Gamma]
+    ParamsFitErr - Error in fitted parameters:
+        [AreaErr, GammaErr]
+    fig : matplotlib.figure.Figure object
+        figure object containing the plot
+    ax : matplotlib.axes.Axes object
+        axes with the data plotted of the:
+            - initial data
+            - final fit
+    """
+
+    RSquared_freqs_full = RSquared_freqs
+    RSquared_PSD_full = RSquared_PSD
+    Freq_endPSD = take_closest(RSquared_freqs_full, Fit_xlim)
+    CutOffFreq_vline = take_closest(RSquared_freqs_full, CutOffFreq)
+    Freq_xlimit = take_closest(RSquared_freqs_full, CutOffFreq*2)
+    index_ylimit = int(_np.where(RSquared_freqs_full == Freq_xlimit)[0][0])
+    index_endPSD = int(_np.where(RSquared_freqs_full == Freq_endPSD)[0][0])
+    RSquared_freqs = RSquared_freqs_full[:index_endPSD]
+    RSquared_PSD = RSquared_PSD_full[:index_endPSD]
+
+    AngFreqs = RSquared_freqs*2*_np.pi
+    datax = AngFreqs
+    datay = RSquared_PSD
+
+    AreaGuess = 1
+    p0 = _np.array([AreaGuess, GammaGuess])
+
+    Params_Fit, Params_Fit_Err = fit_curvefit(
+        p0, datax, datay, _RSquared_PSD_fitting_eqn)
+    RSquared_PSD_fit = _RSquared_PSD_fitting_eqn(
+        datax, Params_Fit[0], Params_Fit[1])
+
+    if MakeFig:
+        fig = _plt.figure(figsize=properties["default_fig_size"])
+        ax = fig.add_subplot(111)
+        ax.plot(RSquared_freqs_full,
+                RSquared_PSD_full,
+                '.',
+                color="darkblue",
+                label=r"$S_{R^2 R^2}$ Data",
+                alpha=0.5)
+        ax.axvline(CutOffFreq_vline,
+                   linestyle='--',
+                   color="black",
+                   label="Cut-Off Frequency")
+        ax.plot(RSquared_freqs,
+                RSquared_PSD_fit,
+                color="red",
+                label="fit")
+        ax.loglog()
+        _plt.suptitle(r'$\gamma = (%.2f\pm%.2f)$Hz' %
+                      (Params_Fit[1]/2/_np.pi, Params_Fit_Err[1]/2/_np.pi))
+        # ax.set_xlim([0, 30e6 / Params_Fit[0] / (2 * _np.pi)])
+        legend = ax.legend(loc="best", frameon=1)
+        frame = legend.get_frame()
+        frame.set_facecolor('white')
+        frame.set_edgecolor('white')
+        ax.set_xlabel("Frequency (Hz)")
+        ax.set_ylabel(
+            r"$S_{R^2 R^2} (V^4/$Hz)"
+        )
+        ax.set_xlim(None, Freq_xlimit)
+        ax.set_ylim(RSquared_PSD_full[index_ylimit], 1.1*_np.max(RSquared_PSD))
         if show_fig:
             _plt.show()
         return Params_Fit, Params_Fit_Err, fig, ax
@@ -4076,9 +4324,62 @@ def calc_autocorrelation(Signal, FFT=False, PyCUDA=False):
         return autocorr[autocorr.size // 2:] / autocorr[autocorr.size // 2]
 
 
+def calc_RSquared(time,
+                  Signal,
+                  SampleFreq,
+                  CenterFreq,
+                  CutOffFreq,
+                  FractionOfSampleFreq):
+    """
+    Calculates the R Squared signal from a given Signal using
+    demodulated signals and butterworth filtering.
+
+    Parameters
+    ----------
+    time : array-like
+        Array containing the time data points of the Signal
+    Signal : array-like
+        Array containing the signal to have the RSquared calculated for
+    SampleFreq : float
+        Sampling frequncy of the Signal
+    CenterFreq : float
+        central frequency of your Signal (oscillator)
+    CutOffFreq : float
+        is the cut off frequncy to get rid of the 2*omega component, make this
+        several times larger than your linewidth, in Hz
+    FractionOfSampleFreq : integer, optional
+            The fraction of the sample frequency to sub-sample the data by.
+            This sometimes needs to be done because a filter with the
+            appropriate frequency response may not be generated using the
+            sample rate at which the data was taken. Increasing this number
+            means the R Squared signal produced by this function will be
+            sampled at a lower rate but a higher number means a higher chance
+            that the filter produced will have a nice frequency response.
+
+    Returns
+    -------
+    RSquared : ndarray
+        Array containing the value of the RSquared signal
+    """
+    time = time[::FractionOfSampleFreq]
+    Signal = Signal[::FractionOfSampleFreq]
+    SampleFreq = SampleFreq / FractionOfSampleFreq
+    demodulation_signal_1 = _np.cos(2*_np.pi*CenterFreq*time)
+    demodulation_signal_2 = _np.sin(2*_np.pi*CenterFreq*time)
+    X = Signal*demodulation_signal_1
+    Y = Signal*demodulation_signal_2
+    b, a = make_butterworth_b_a(CutOffFreq, CutOffFreq,
+                                SampleFreq, btype='low')
+    X_filtered = _np.real(scipy.signal.filtfilt(b, a, X))
+    Y_filtered = _np.real(scipy.signal.filtfilt(b, a, Y))
+    RSquared = X_filtered**2 + Y_filtered**2
+    return RSquared
+
+
 def _GetRealImagArray(Array):
     """
-    Returns the real and imaginary components of each element in an array and returns them in 2 resulting arrays.
+    Returns the real and imaginary components of each element in an array and
+    returns them in 2 resulting arrays.
 
     Parameters
     ----------
