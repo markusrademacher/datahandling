@@ -30,6 +30,7 @@ import uncertainties as _uncertainties
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 from matplotlib import rcParams
 import matplotlib.animation as _animation
+import matplotlib.ticker as _ticker
 from glob import glob
 import re
 import seaborn as _sns
@@ -683,7 +684,8 @@ class DataObject():
             freqs = self.freqs
             PSD = self.PSD
         else:
-            freqs, PSD = self.get_PSD(timeStart=timeStart, timeEnd=timeEnd)
+            freqs, PSD = self.get_PSD(
+                timeStart=timeStart, timeEnd=timeEnd)
 
         unit_prefix = units[:-2]
         if xlim is None:
@@ -1262,6 +1264,8 @@ class DataObject():
                                         GammaGuess=None,
                                         CutOffFreq=None,
                                         FreqTrapGuess=None,
+                                        AGuess=None,
+                                        OffsetGuess=None,
                                         FractionOfSampleFreq=1,
                                         NPerSegmentPSD=None,
                                         Fit_xlim=None,
@@ -1279,11 +1283,20 @@ class DataObject():
         ----------
         GammaGuess : float, optional
             Inital guess for BigGamma in Radians
+            If None takes Gamma from a previously done PSD fit
         CutOffFreq : float, optional
             is the cut off frequncy to get rid of the 2*omega component, make
             this several times larger than your linewidth, in Hz
         FreqTrapGuess : float, optional
             Inital guess for the trapping Frequency in Hz
+            If None takes FreqTrap from a previously done PSD fit
+        AGuess : float, optional
+            Inital guess for the multiplicative factor in R^2 which equals:
+            8*(S_F/(2m^2*Omega0^2))^2
+            If None, AGuess set to 1.
+        OffsetGuess : float, optional
+            Additive Offset to the fitting equation.
+            If None, OffsetGuess is set to 0.
         FractionOfSampleFreq : integer, optional
             The fraction of the sample frequency to sub-sample the data by.
             This sometimes needs to be done because a filter with the
@@ -1295,9 +1308,10 @@ class DataObject():
         NPerSegmentPSD : int, optional
             NPerSegment to pass to scipy.signal.welch to calculate the PSD
             default = 100/BigGamma*SampleFreq
-        Fit_xlim : float, optional
+        Fit_xlim : list of float, optional
             limits the R Squared PSD signal used for the fit function,
-            default = 0.75 * CutOffFreq
+            i.e.: [lowerLimit, upperLimit]
+            default = [RSquared_freqs[0], 0.75 * CutOffFreq]
         silent : bool, optional
             Whether it prints the values fitted or is silent.
         MakeFig : bool, optional
@@ -1329,12 +1343,14 @@ class DataObject():
             FreqTrap_Initial = self.FTrap.n
         else:
             FreqTrap_Initial = FreqTrapGuess
+        if OffsetGuess is None:
+            OffsetGuess = 0
+        if AGuess is None:
+            AGuess = 1
         if NPerSegmentPSD is None:
             NPerSegmentPSD = 100/Gamma_Initial*self.SampleFreq
-        if Fit_xlim is None:
-            Fit_xlim = 0.75*CutOffFreq
         if round(FreqTrap_Initial / (Gamma_Initial / 2 / _np.pi)) < 10:
-            print('Q-factor < 10: method is unsuitable to determine Gamma')
+            print('Q-factor < 10: method maybe unsuitable to determine Gamma')
 
         time = self.time.get_array()
         RSquared = calc_RSquared(time,
@@ -1346,11 +1362,14 @@ class DataObject():
         RSquared_freqs, RSquared_PSD = calc_PSD(RSquared, self.SampleFreq /
                                                 FractionOfSampleFreq,
                                                 NPerSegment=NPerSegmentPSD)
-
+        if Fit_xlim is None:
+            Fit_xlim = [RSquared_freqs[0], 0.75*CutOffFreq]
         if MakeFig:
             Params, ParamsErr, fig, ax = fit_RSquared_PSD(RSquared_PSD,
                                                           RSquared_freqs,
                                                           Gamma_Initial,
+                                                          AGuess,
+                                                          OffsetGuess,
                                                           CutOffFreq,
                                                           Fit_xlim,
                                                           MakeFig=MakeFig,
@@ -1359,6 +1378,8 @@ class DataObject():
             Params, ParamsErr, _, _ = fit_RSquared_PSD(RSquared_PSD,
                                                        RSquared_freqs,
                                                        Gamma_Initial,
+                                                       AGuess,
+                                                       OffsetGuess,
                                                        CutOffFreq,
                                                        Fit_xlim,
                                                        MakeFig=MakeFig,
@@ -1369,6 +1390,10 @@ class DataObject():
 
             print(
                 "Big Gamma: {} +- {}% ".format(Params[1], ParamsErr[1] / Params[1] * 100))
+            print("A: {} +- {}% ".format(Params[0],
+                                         ParamsErr[0] / Params[0] * 100))
+            print("Offset: {} +- {}% ".format(Params[2],
+                                              ParamsErr[2] / Params[2] * 100))
 
         Gamma = _uncertainties.ufloat(Params[1], ParamsErr[1])
 
@@ -1376,6 +1401,153 @@ class DataObject():
             return Gamma, fig, ax
         else:
             return Gamma, None, None
+
+    def plot_spectrogram(self,
+                         timePerFFT=3e-4,
+                         title='',
+                         ylim=None,
+                         timeStart=None,
+                         timeEnd=None,
+                         xunits="s",
+                         yunits="kHz",
+                         return_data=False,
+                         animate=False,
+                         filename='animation.gif',
+                         show_fig=True,
+                         **kwargs):
+        """
+        plot the spectrogram or produce an animated plot
+        the spectrogram.
+
+        Parameters
+        ----------
+        timePerFFT : float, default: 1e-3
+            The time in xunits used in each block for the FFT. 
+        title : string, optional
+            title to be displayed on the plot
+        ylim : array_like, optional
+            The y limits of the plotted spectrogram [LowerLimit, UpperLimit]
+            Default value is [0, SampleFreq/2]
+        timeStart : float, optional
+            Starting time for spectrogram calculation. Defaults to start of
+            time data.
+        timeEnd : float, optional
+            Ending time for spectrogram calculation. Defaults to end of time
+            data.
+        xunits : string, optional
+            Units of time used for timePerFFT, timeStart and timeEnd
+            - defaults to s
+        yunits : string, optional
+            Units of frequency limits to plot on the y axis - defaults to kHz
+        return_data : bool, optional
+            If True data (spec, freqs and t) of spectrogram will be returned
+        animate : bool, optional
+            If True will animate the spectrogram plot.
+        filename : string, optional
+            filename to save animation
+        show_fig : bool, optional
+            If True runs plt.show() before returning figure
+            if False it just returns the figure object.
+            (the default is True, it shows the figure)
+
+        Returns
+        -------
+        spectrum : 2D array
+            Columns are the periodograms of successive segments.
+            Only returned if return_data=True
+        freqs : 1-D array
+            The frequencies corresponding to the rows in *spectrum*.
+            Only returned if return_data=True
+        t : 1-D array
+            The times corresponding to midpoints of segments (i.e., the columns
+            in *spectrum*).
+            Only returned if return_data=True
+        fig : matplotlib.figure.Figure object
+            The figure object created
+        ax : matplotlib.axes.Axes object
+            The subplot object created
+        """
+        xunits_prefix = xunits[:-1]  # removes the last char
+        timePerFFT = unit_conversion(timePerFFT,
+                                     unit_prefix='',
+                                     current_prefix=xunits_prefix)
+        if timeStart is None and timeEnd is None:
+            Signal = self.voltage
+        else:
+            if timeStart is None:
+                timeStart = self.timeStart
+            if timeEnd is None:
+                timeEnd = self.timeEnd
+
+            time = unit_conversion(self.time.get_array(), xunits_prefix)
+
+            StartIndex = _np.where(time == take_closest(time, timeStart))[0][0]
+            EndIndex = _np.where(time == take_closest(time, timeEnd))[0][0]
+
+            if EndIndex == len(time) - 1:
+                EndIndex = EndIndex + 1  # so that it does not remove the last element
+            Signal = self.voltage[StartIndex:EndIndex]
+
+        yunit_prefix = yunits[:-2]
+        if ylim is None:
+            ylim = [0, self.SampleFreq / 2]
+        else:
+            ylim = [unit_conversion(ylim[0], unit_prefix='',
+                                    current_prefix=yunit_prefix),
+                    unit_conversion(ylim[1], unit_prefix='',
+                                    current_prefix=yunit_prefix)]
+        fig = _plt.figure(figsize=properties['default_fig_size'])
+        ax = fig.add_subplot(111)
+        spec, freqs, t, im = ax.specgram(Signal,
+                                         Fs=self.SampleFreq,
+                                         scale='dB',
+                                         NFFT=int(timePerFFT*self.SampleFreq),
+                                         noverlap=int(
+                                             timePerFFT*self.SampleFreq/2),
+                                         cmap='viridis',
+                                         **kwargs)
+
+        formattery = _ticker.EngFormatter(unit='Hz')
+        ax.yaxis.set_major_formatter(formattery)
+        formatterx = _ticker.EngFormatter(unit='s')
+        ax.xaxis.set_major_formatter(formatterx)
+        ax.set_xlabel("time")
+        ax.set_ylabel("Frequency")
+        ax.set_title(title)
+        ax.set_ylim(ylim)
+
+        # ax.grid(which="major")
+        cbar = _plt.colorbar(im, ax=ax)
+        cbar.set_label('Amplitude (dB)')
+        cbar.minorticks_on()
+
+        if animate:
+            animation_window = 100 * timePerFFT
+            last_frame_index = _np.where(
+                t == take_closest(t, animation_window))[0][0]
+            ax.set_xlim(0, animation_window)
+            fps = 25
+
+            def update(frame):
+                ax.set_xlim(frame, frame+animation_window)
+                # print(frame)
+                return im
+
+            ani = _animation.FuncAnimation(
+                fig, update, frames=t[:-last_frame_index], blit=False)
+            if filename.split('.')[-1] == 'gif':
+                timePerRenderedFrame = 1
+                print("This will take ~ {} minutes".format(
+                    timePerRenderedFrame * len(t[:-last_frame_index]) / 60))
+                ani.save(filename, writer='imagemagick', fps=fps, dpi=300)
+                print('Sucessfully saved animation.')
+
+        if show_fig and not animate:
+            _plt.show()
+        if return_data:
+            return spec, freqs, t, fig, ax
+        else:
+            return fig, ax
 
     def extract_parameters(self, P_mbar, P_Error, method="chang"):
         """
@@ -2572,39 +2744,47 @@ def fit_autocorrelation(autocorrelation,
         return Params_Fit, Params_Fit_Err, None, None
 
 
-def _RSquared_PSD_fitting_eqn(Omega, Area, Gamma):
+def _RSquared_PSD_fitting_eqn(Omega, A, Gamma, Offset):
     """
     The value of the fitting equation:
-    Area / Gamma / (Omega**2 + Gamma**2)
+    A / Gamma / (Omega**2 + Gamma**2)
     to be fit to the R Squared PSD signal, taken from equation 3 of paper
-    (DOI: 10.1103/PhysRevResearch.2.023349).
+    (DOI: 10.1103/PhysRevResearch.2.023349) plus an additive offset.
 
     Parameters
     ----------
     Omega : float
         frequency in Radians
+    A : float
+        Multiplicative factor for the curve representing:
+        8*(S_F/(2m^2*Omega0^2))^2
     Gamma : float
         Big Gamma (in Radians), i.e. damping
+    Offset : float
+        Additive Offset to the fitting equation.
+
 
     Returns
     -------
     Value : float
         The value of the fitting equation
     """
-    return Area / Gamma / (Omega**2 + Gamma**2)
+    return A / Gamma / (Omega**2 + Gamma**2) + Offset
 
 
 def fit_RSquared_PSD(RSquared_PSD,
                      RSquared_freqs,
                      GammaGuess,
+                     AGuess,
+                     OffsetGuess,
                      CutOffFreq,
                      Fit_xlim,
                      MakeFig=True,
                      show_fig=True):
     """
-    Fits equation 3 of paper (DOI: 10.1103/PhysRevResearch.2.023349) to the
-    computed PSD of the R Squared signal and returns the parameters with
-    errors.
+    Fits equation 3 of paper (DOI: 10.1103/PhysRevResearch.2.023349) plus
+    additive Offset to the computed PSD of the R Squared signal and returns
+    the parameters with errors.
 
     Parameters
     ----------
@@ -2615,11 +2795,17 @@ def fit_RSquared_PSD(RSquared_PSD,
         signal was computed
     GammaGuess : float
         The approximate Big Gamma (in radians) to use initially
+    AGuess : float
+        Inital guess for multiplicative factor for R^2 which equals:
+        8*(S_F/(2m^2*Omega0^2))^2
+    OffsetGuess : float
+        Additive Offset to the fitting equation.
     CutOffFreq : float
         is the cut off frequency applied via a lowpass filter when calculating
         the R Squared signal
-    Fit_xlim : float, optional
+    Fit_xlim : list of float, optional
         limits the R Squared PSD signal used for the fit function
+        i.e.: [lowerLimit, upperLimit]
     MakeFig : bool, optional
         Whether to construct and return the figure object showing
         the fitting. defaults to True
@@ -2630,9 +2816,9 @@ def fit_RSquared_PSD(RSquared_PSD,
     Returns
     -------
     ParamsFit - Fitted parameters:
-        [Area, Gamma]
+        [A, Gamma, Offset]
     ParamsFitErr - Error in fitted parameters:
-        [AreaErr, GammaErr]
+        [AErr, GammaErr, OffsetErr]
     fig : matplotlib.figure.Figure object
         figure object containing the plot
     ax : matplotlib.axes.Axes object
@@ -2643,25 +2829,26 @@ def fit_RSquared_PSD(RSquared_PSD,
 
     RSquared_freqs_full = RSquared_freqs
     RSquared_PSD_full = RSquared_PSD
-    Freq_endPSD = take_closest(RSquared_freqs_full, Fit_xlim)
+    Freq_startPSD = take_closest(RSquared_freqs_full, Fit_xlim[0])
+    Freq_endPSD = take_closest(RSquared_freqs_full, Fit_xlim[1])
     CutOffFreq_vline = take_closest(RSquared_freqs_full, CutOffFreq)
     Freq_xlimit = take_closest(RSquared_freqs_full, CutOffFreq*2)
     index_ylimit = int(_np.where(RSquared_freqs_full == Freq_xlimit)[0][0])
+    index_startPSD = int(_np.where(RSquared_freqs_full == Freq_startPSD)[0][0])
     index_endPSD = int(_np.where(RSquared_freqs_full == Freq_endPSD)[0][0])
-    RSquared_freqs = RSquared_freqs_full[:index_endPSD]
-    RSquared_PSD = RSquared_PSD_full[:index_endPSD]
+    RSquared_freqs = RSquared_freqs_full[index_startPSD:index_endPSD]
+    RSquared_PSD = RSquared_PSD_full[index_startPSD:index_endPSD]
 
     AngFreqs = RSquared_freqs*2*_np.pi
     datax = AngFreqs
     datay = RSquared_PSD
 
-    AreaGuess = 1
-    p0 = _np.array([AreaGuess, GammaGuess])
+    p0 = _np.array([AGuess, GammaGuess, OffsetGuess])
 
     Params_Fit, Params_Fit_Err = fit_curvefit(
         p0, datax, datay, _RSquared_PSD_fitting_eqn)
     RSquared_PSD_fit = _RSquared_PSD_fitting_eqn(
-        datax, Params_Fit[0], Params_Fit[1])
+        datax, Params_Fit[0], Params_Fit[1], Params_Fit[2])
 
     if MakeFig:
         fig = _plt.figure(figsize=properties["default_fig_size"])
@@ -2693,7 +2880,7 @@ def fit_RSquared_PSD(RSquared_PSD,
             r"$S_{R^2 R^2} (V^4/$Hz)"
         )
         ax.set_xlim(None, Freq_xlimit)
-        ax.set_ylim(RSquared_PSD_full[index_ylimit], 1.1*_np.max(RSquared_PSD))
+        ax.set_ylim(RSquared_PSD_full[index_ylimit], 1.5*_np.max(RSquared_PSD))
         if show_fig:
             _plt.show()
         return Params_Fit, Params_Fit_Err, fig, ax
