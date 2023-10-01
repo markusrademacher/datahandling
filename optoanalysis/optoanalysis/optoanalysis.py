@@ -283,6 +283,7 @@ class DataObject():
                                 SampleFreq = float(sample_frequency)
                             if NumberOfChannels is None:
                                 NumberOfChannels = int(number_of_channels)
+                            break
             except ValueError:
                 pass
             if SampleFreq is None:
