@@ -1423,7 +1423,7 @@ class DataObject():
         Parameters
         ----------
         timePerFFT : float, default: 1e-3
-            The time in xunits used in each block for the FFT. 
+            The time in xunits used in each block for the FFT.
         title : string, optional
             title to be displayed on the plot
         ylim : array_like, optional
@@ -4461,6 +4461,198 @@ def calc_PSD(Signal, SampleFreq, NPerSegment=1000000, window="hann"):
     PSD = PSD[freqs.argsort()]
     freqs.sort()
     return freqs, PSD
+
+
+def calc_CSD(Signal1, Signal2, SampleFreq, NPerSegment=1000000, window="hann"):
+    """
+    Calculates the cross-correlation spectral density (CSD) of two signals.
+
+    Parameters
+    ----------
+    Signal1 : array-like
+        Array containing the 1st of the two signals to calculate the CSD of
+    Signal2 : array-like
+        Array containing the 2nd of the two signals to calculate the CSD of
+    SampleFreq : float
+        Sample frequency of the signal arrays
+    NPerSegment : int, optional
+        Length of each segment used in scipy.signal.csd
+        default = 1000000
+    window : str or tuple or array_like, optional
+        Desired window to use. See get_window for a list of windows
+        and required parameters. If window is array_like it will be
+        used directly as the window and its length will be used for
+        nperseg.
+        default = "hann"
+
+    Returns
+    -------
+    freqs : ndarray
+            Array containing the frequencies at which the PSD has been
+            calculated
+    PSD : ndarray
+            Array containing the value of the PSD at the corresponding
+            frequency value in V**2/Hz
+    """
+    freqs, CSD = scipy.signal.csd(Signal1,
+                                  Signal2,
+                                  SampleFreq,
+                                  nperseg=NPerSegment,
+                                  window=window)
+    CSD = CSD[freqs.argsort()]
+    freqs.sort()
+    return freqs, CSD
+
+
+def get_CSD(DataObject1,
+            DataObject2,
+            NPerSegment=1000000,
+            window="hann",
+            timeStart=None,
+            timeEnd=None,
+            override=False):
+    """
+    Extracts the cross-correlation spectral density (CSD) from the two sets of data.
+
+    Parameters
+    ----------
+    DataObject1 : DataObject
+        An instance of the DataObject class contaning the 1st part of the data for the CSD
+    DataObject2 : DataObject
+        An instance of the DataObject class contaning the 2nd part of the data for the CSD
+    NPerSegment : int, optional
+        Length of each segment used in scipy.welch
+        default = 1000000
+    window : str or tuple or array_like, optional
+        Desired window to use. See get_window for a list of windows
+        and required parameters. If window is array_like it will be
+        used directly as the window and its length will be used for
+        nperseg.
+        default = "hann"
+
+    Returns
+    -------
+    freqs : ndarray
+            Array containing the frequencies at which the PSD has been
+            calculated
+    CSD : ndarray
+            Array containing the value of the CSD at the corresponding
+            frequency value in V**2/Hz
+    """
+    Signal1 = DataObject1.voltage
+    Signal2 = DataObject2.voltage
+
+    # things like SamplFreq and timeStart_CSD, timeEnd_CSD are always taken from DataObject1
+    SampleFreq = DataObject1.SampleFreq
+
+    if timeStart is None and timeEnd is None:
+        freqs, CSD = calc_CSD(Signal1,
+                              Signal2,
+                              SampleFreq,
+                              NPerSegment=NPerSegment,
+                              window=window)
+        DataObject1.CSD = CSD
+        DataObject2.CSD = CSD
+        DataObject1.freqs_CSD = freqs
+        DataObject2.freqs_CSD = freqs
+    else:
+        if timeStart is None:
+            timeStart = DataObject1.timeStart_CSD
+        if timeEnd is None:
+            timeEnd = DataObject1.timeEnd_CSD
+
+        time = DataObject1.time.get_array()
+
+        StartIndex = _np.where(time == take_closest(time, timeStart))[0][0]
+        EndIndex = _np.where(time == take_closest(time, timeEnd))[0][0]
+
+        if EndIndex == len(time) - 1:
+            EndIndex = EndIndex + 1  # so that it does not remove the last element
+        Signal1 = DataObject1.voltage[StartIndex:EndIndex]
+        Signal2 = DataObject2.voltage[StartIndex:EndIndex]
+        freqs, CSD = calc_CSD(Signal1,
+                              Signal2,
+                              SampleFreq,
+                              NPerSegment=NPerSegment,
+                              window=window)
+        if override:
+            DataObject1.freqs_CSD = freqs
+            DataObject2.freqs_CSD = freqs
+            DataObject1.CSD = CSD
+            DataObject2.CSD = CSD
+
+    return freqs, CSD
+
+
+def plot_CSD(DataObject1,
+             DataObject2,
+             NPerSegment=1000000,
+             window="hann",
+             timeStart=None,
+             timeEnd=None,
+             xlim=None,
+             units="kHz",
+             show_fig=True,
+             *args,
+             **kwargs):
+    """
+    plot the cross-correlation spectral density.
+
+    Parameters
+    ----------
+    DataObject1 : DataObject
+        An instance of the DataObject class contaning the 1st part of the data for the CSD
+    DataObject2 : DataObject
+        An instance of the DataObject class contaning the 2nd part of the data for the CSD
+    NPerSegment : int, optional
+        Length of each segment used in scipy.welch
+        default = 1000000
+    window : str or tuple or array_like, optional
+        Desired window to use. See get_window for a list of windows
+        and required parameters. If window is array_like it will be
+        used directly as the window and its length will be used for
+        nperseg.
+        default = "hann"
+    xlim : array_like, optional
+        The x limits of the plotted PSD [LowerLimit, UpperLimit]
+        Default value is [0, SampleFreq/2]
+    units : string, optional
+        Units of frequency to plot on the x axis - defaults to kHz
+    show_fig : bool, optional
+        If True runs plt.show() before returning figure
+        if False it just returns the figure object.
+        (the default is True, it shows the figure)
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure object
+        The figure object created
+    ax : matplotlib.axes.Axes object
+        The subplot object created
+    """
+
+    freqs, CSD = get_CSD(
+        DataObject1,
+        DataObject2,
+        NPerSegment=NPerSegment,
+        window=window,
+        timeStart=timeStart,
+        timeEnd=timeEnd,
+    )
+
+    unit_prefix = units[:-2]
+    if xlim is None:
+        xlim = [0, unit_conversion(DataObject1.SampleFreq / 2, unit_prefix)]
+    fig = _plt.figure(figsize=properties['default_fig_size'])
+    ax = fig.add_subplot(111)
+    ax.plot(unit_conversion(freqs, unit_prefix), CSD, *args, **kwargs)
+    ax.set_xlabel("Frequency ({})".format(units))
+    ax.set_xlim(xlim)
+    ax.grid(which="major")
+    ax.set_ylabel("CSD ($V^2/Hz$)")
+    if show_fig:
+        _plt.show()
+    return fig, ax
 
 
 def calc_autocorrelation(Signal, FFT=False, PyCUDA=False):
