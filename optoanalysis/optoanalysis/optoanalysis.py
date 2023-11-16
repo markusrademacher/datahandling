@@ -200,6 +200,21 @@ class DataObject():
             self.get_PSD(NPerSegment=NPerSegmentPSD,
                          NOverlap=NOverlapPSD,
                          window=windowPSD)
+
+        self.CSDs = {}
+        # see get_CSD()
+        # key = the other DataObject instance with which the CSD is calculated
+        # value = a tuple of the (frequencies, CSD values, 1st or 2nd)
+        # e.g.
+        # Sxy has x 1st, y 2nd
+        # x_data.CSDs[y_data] = (freqs, Sxy values, 1)
+        # y_data.CSDs[x_data] = (freqs, Sxy values, 2)
+        # whereas
+        # Syx has y 1st, x 2nd
+        # y_data.CSDs[x_data] = (freqs, Syx values, 1)
+        # x_data.CSDs[y_data] = (freqs, Syx values, 2)
+        # noting that Sxy = Syx*, i.e. they are a complex conjugate pair.
+
         return None
 
     def load_time_data(self,
@@ -4614,7 +4629,7 @@ def get_CSD(DataObject1,
     Signal1 = DataObject1.voltage
     Signal2 = DataObject2.voltage
 
-    # things like SamplFreq and timeStart_CSD, timeEnd_CSD are always taken from DataObject1
+    # things like SamplFreq and timeStart, timeEnd are always taken from DataObject1
     SampleFreq = DataObject1.SampleFreq
 
     if timeStart is None and timeEnd is None:
@@ -4625,15 +4640,14 @@ def get_CSD(DataObject1,
                               NPerSegment=NPerSegment,
                               NOverlap=NOverlap,
                               window=window)
-        DataObject1.CSD = CSD
-        DataObject2.CSD = CSD
-        DataObject1.freqs_CSD = freqs
-        DataObject2.freqs_CSD = freqs
+        DataObject1.CSDs[DataObject2] = freqs, CSD, 1
+        DataObject2.CSDs[DataObject1] = freqs, CSD, 2
+
     else:
         if timeStart is None:
-            timeStart = DataObject1.timeStart_CSD
+            timeStart = DataObject1.timeStart
         if timeEnd is None:
-            timeEnd = DataObject1.timeEnd_CSD
+            timeEnd = DataObject1.timeEnd
 
         time = DataObject1.time.get_array()
 
@@ -4652,10 +4666,8 @@ def get_CSD(DataObject1,
                               NOverlap=NOverlap,
                               window=window)
         if override:
-            DataObject1.freqs_CSD = freqs
-            DataObject2.freqs_CSD = freqs
-            DataObject1.CSD = CSD
-            DataObject2.CSD = CSD
+            DataObject1.CSDs[DataObject2] = freqs, CSD, 1
+            DataObject2.CSDs[DataObject1] = freqs, CSD, 2
 
     return freqs, CSD
 
