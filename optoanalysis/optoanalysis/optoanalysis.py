@@ -4565,7 +4565,6 @@ def calc_CSD(Signal1, Signal2, SampleFreq, CSDPart="real", NPerSegment=1000000, 
             Array containing the value of the PSD at the corresponding
             frequency value in V**2/Hz
     """
-    print(f'DEBUG:calc_CSD:NOVerlap={NOverlap}')
     freqs, CSD = scipy.signal.csd(Signal1,
                                   Signal2,
                                   SampleFreq,
